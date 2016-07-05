@@ -5,3 +5,4 @@ authors = ["Dave Vasilevsky <dave@vasilevsky.ca>"]
 
 [dependencies]
 nix = "0.6.0"
+byteorder = "0.5"

@@ -1,4 +1,3 @@
-
 extern crate qcow2;
 use qcow2::Pread;
 

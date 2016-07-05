@@ -1,36 +1,24 @@
+mod error;
+mod header;
+mod io;
 mod pread;
 pub use pread::{Pread, Pwrite};
 
-mod error;
-pub use error::Error;
-
-mod header;
-use header::Header;
-
-extern crate byteorder;
-use byteorder::BigEndian;
-
-use std::mem;
-
 const MAGIC: u32 = 0x514649fb;
 
-pub struct Qcow2<I>
-    where I: Pread
-{
-    header: Header,
-    io: self::io::Pread,
+pub struct Qcow2 {
+    header: header::Header,
+    io: io::Pread,
 }
 
-pub type Result<T> = std::result::Result<T, Error>;
+pub type Result<T> = std::result::Result<T, error::Error>;
 
-impl<I> Qcow2<I>
-    where I: io::Pread
-{
-    pub fn open(io: I) -> Result<Qcow2<I>> {
-        let mut buf = vec![0; mem::size_of::<Header>()];
+impl Qcow2 {
+    pub fn open<I>(io: I) -> Result<Qcow2> {
+        let mut buf = vec![0; std::mem::size_of::<header::Header>()];
         try!(io.pread_exact(&mut buf, 0));
 
-        let header: Header = Default::default();
+        let header: header::Header = Default::default();
         let mut curs = std::io::Cursor::new(buf);
         // header.magic = try!(curs.read_)
 
