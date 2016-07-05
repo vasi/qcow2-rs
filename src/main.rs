@@ -1,6 +1,6 @@
 
 extern crate qcow2;
-use qcow2::pread::Pread;
+use qcow2::Pread;
 
 fn main() {
     let file = std::fs::File::open("Cargo.toml").unwrap();

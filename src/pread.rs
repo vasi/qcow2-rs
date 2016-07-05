@@ -1,5 +1,4 @@
 use std::io::Result;
-use std::fs::File;
 
 pub trait Pread {
     fn pread(&self, buf: &mut [u8], pos: u64) -> Result<usize>;
@@ -16,11 +15,12 @@ pub trait Pwrite {
 
 use std::io::{Error, ErrorKind};
 use std::os::unix::io::AsRawFd;
+use std::fs;
 
 extern crate nix;
 use self::nix::sys::uio;
 
-impl Pread for File {
+impl Pread for fs::File {
     fn pread(&self, buf: &mut [u8], pos: u64) -> Result<usize> {
         let fd = self.as_raw_fd();
         uio::pread(fd, buf, pos as i64).map_err(From::from)
