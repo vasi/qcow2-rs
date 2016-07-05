@@ -36,7 +36,7 @@ impl<I, E> Io<I, E>
     pub fn new(io: I) -> Self {
         Io {
             io: io,
-            endian: PhantomData,
+            endian: PhantomData::<E>,
         }
     }
 }
