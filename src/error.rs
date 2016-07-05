@@ -5,6 +5,8 @@ use std::error::Error as StdError;
 pub enum Error {
     Io(std::io::Error),
     FileType,
+    Version(u32, u32),
+    UnsupportedFeature(String),
 }
 
 impl From<std::io::Error> for Error {
@@ -18,6 +20,8 @@ impl StdError for Error {
         match *self {
             Error::Io(ref err) => err.description(),
             Error::FileType => "Not a qcow2 file",
+            Error::Version(_, _) => "Unsupported version",
+            Error::UnsupportedFeature(_) => "Unsupported feature",
         }
     }
 
@@ -33,6 +37,10 @@ impl std::fmt::Display for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match *self {
             Error::Io(ref err) => err.fmt(f),
+            Error::Version(cur, sup) => {
+                write!(f, "Unsupported version {}, only {} is allowed", cur, sup)
+            }
+            Error::UnsupportedFeature(ref feat) => write!(f, "Unsupported feature {}", feat),
             _ => f.write_str(self.description()),
         }
     }
