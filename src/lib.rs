@@ -1,20 +1,27 @@
+extern crate byteorder;
+
 mod error;
 mod header;
 mod io;
+use io::Io;
 mod pread;
 pub use pread::{Pread, Pwrite};
 
 const MAGIC: u32 = 0x514649fb;
 
-pub struct Qcow2 {
+pub struct Qcow2<I>
+    where I: Pread
+{
     header: header::Header,
-    io: io::Pread,
+    io: Io<I, byteorder::BigEndian>,
 }
 
 pub type Result<T> = std::result::Result<T, error::Error>;
 
-impl Qcow2 {
-    pub fn open<I>(io: I) -> Result<Qcow2> {
+impl<I> Qcow2<I>
+    where I: Pread
+{
+    pub fn open(io: I) -> Result<Self> {
         let mut buf = vec![0; std::mem::size_of::<header::Header>()];
         try!(io.pread_exact(&mut buf, 0));
 
@@ -24,7 +31,7 @@ impl Qcow2 {
 
         Ok(Qcow2 {
             header: header,
-            io: io,
+            io: Io::new(io),
         })
     }
 }
