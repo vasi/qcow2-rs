@@ -4,5 +4,6 @@ version = "0.1.0"
 authors = ["Dave Vasilevsky <dave@vasilevsky.ca>"]
 
 [dependencies]
-nix = "0.6.0"
 byteorder = "0.5"
+positioned-io = "0.1.0"
+num = "0.1"

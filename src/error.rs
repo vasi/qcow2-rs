@@ -7,6 +7,7 @@ pub enum Error {
     FileType,
     Version(u32, u32),
     UnsupportedFeature(String),
+    FileFormat(String),
 }
 
 impl From<std::io::Error> for Error {
@@ -22,6 +23,7 @@ impl StdError for Error {
             Error::FileType => "Not a qcow2 file",
             Error::Version(_, _) => "Unsupported version",
             Error::UnsupportedFeature(_) => "Unsupported feature",
+            Error::FileFormat(_) => "Malformed qcow2 file",
         }
     }
 
@@ -41,6 +43,7 @@ impl std::fmt::Display for Error {
                 write!(f, "Unsupported version {}, only {} is allowed", cur, sup)
             }
             Error::UnsupportedFeature(ref feat) => write!(f, "Unsupported feature {}", feat),
+            Error::FileFormat(ref err) => write!(f, "Malformed qcow2 file: {}", err),
             _ => f.write_str(self.description()),
         }
     }
