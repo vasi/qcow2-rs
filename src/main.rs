@@ -9,12 +9,14 @@ fn run() -> Result<Qcow2<File>, Box<Error>> {
     let mut args = args();
     let filename = try!(args.nth(1).ok_or("Provide at least one argument"));
     let file = try!(File::open(filename));
-    qcow2::Qcow2::open(file, false).map_err(From::from)
+
+    let q = try!(qcow2::Qcow2::open(file));
+    println!("{:#?}", q);
+    Ok(q)
 }
 
 fn main() {
-    match run() {
-        Ok(_) => println!("Ok!"),
-        Err(ref e) => println!("Error: {}", e),
+    if let Err(e) = run() {
+        println!("Error: {}", e);
     }
 }
