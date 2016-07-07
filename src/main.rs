@@ -9,7 +9,7 @@ fn run() -> Result<Qcow2<File>, Box<Error>> {
     let mut args = args();
     let filename = try!(args.nth(1).ok_or("Provide at least one argument"));
     let file = try!(File::open(filename));
-    qcow2::Qcow2::open(file).map_err(From::from)
+    qcow2::Qcow2::open(file, false).map_err(From::from)
 }
 
 fn main() {
