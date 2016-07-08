@@ -3,7 +3,7 @@ use std::collections::HashSet;
 use std::fmt::{self, Debug, Formatter};
 use std::io::{self, Read};
 use std::mem::size_of;
-use std::ops::{DerefMut};
+use std::ops::DerefMut;
 use std::rc::Rc;
 use std::result;
 
@@ -88,14 +88,17 @@ impl HeaderV3 {
 impl Debug for HeaderV3 {
     fn fmt(&self, fmt: &mut Formatter) -> result::Result<(), fmt::Error> {
         fmt.debug_struct("HeaderV3")
-        .field("incompatible", &self.incompatible.debug(&self.feature_name_table()))
-        .field("compatible", &self.compatible.debug(&self.feature_name_table()))
-        .field("autoclear", &self.autoclear.debug(&self.feature_name_table()))
-        .field("refcount_order", &self.refcount_order)
-        .field("header_length", &self.header_length)
-        .field("feature_name_table", &self.feature_name_table.borrow())
-        .field("backing_file_name", &self.backing_file_name)
-        .field("extensions", &DebugExtensions(&self.extensions))
+            .field("incompatible",
+                   &self.incompatible.debug(&self.feature_name_table()))
+            .field("compatible",
+                   &self.compatible.debug(&self.feature_name_table()))
+            .field("autoclear",
+                   &self.autoclear.debug(&self.feature_name_table()))
+            .field("refcount_order", &self.refcount_order)
+            .field("header_length", &self.header_length)
+            .field("feature_name_table", &self.feature_name_table.borrow())
+            .field("backing_file_name", &self.backing_file_name)
+            .field("extensions", &DebugExtensions(&self.extensions))
             .finish()
     }
 }
@@ -192,7 +195,8 @@ impl Header {
 
             // No duplicates allowed
             if seen.contains(&ext_code) {
-                return Err(Error::FileFormat(format!("Duplicate header extension {:#x}", ext_code)));
+                return Err(Error::FileFormat(format!("Duplicate header extension {:#x}",
+                                                     ext_code)));
             }
             seen.insert(ext_code);
 
@@ -207,8 +211,10 @@ impl Header {
                 // Verify all is read.
                 let remain = sub.bytes().count();
                 if remain > 0 {
-                    return Err(Error::FileFormat(
-                        format!("{} bytes left after reading extension {:#x}", remain, ext_code)));
+                    return Err(Error::FileFormat(format!("{} bytes left after reading \
+                                                          extension {:#x}",
+                                                         remain,
+                                                         ext_code)));
                 }
             }
 

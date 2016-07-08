@@ -49,7 +49,7 @@ impl Feature {
         Feature {
             kind: self.kind,
             names: self.names,
-            bits: self.bits & !((1 << known) - 1)
+            bits: self.bits & !((1 << known) - 1),
         }
     }
 

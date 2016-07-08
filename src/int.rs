@@ -1,6 +1,6 @@
 use num;
 
-pub trait Integer : num::Integer + Copy {
+pub trait Integer: num::Integer + Copy {
     // Divide, rounding up.
     fn div_ceil(self, other: Self) -> Self {
         let (d, m) = self.div_rem(&other);

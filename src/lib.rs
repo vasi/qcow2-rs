@@ -39,7 +39,9 @@ impl<I> Qcow2<I>
     }
 }
 
-impl<I> Debug for Qcow2<I> where I: ReadAt {
+impl<I> Debug for Qcow2<I>
+    where I: ReadAt
+{
     fn fmt(&self, f: &mut Formatter) -> result::Result<(), fmt::Error> {
         f.debug_struct("Qcow2")
             .field("header", &self.header)

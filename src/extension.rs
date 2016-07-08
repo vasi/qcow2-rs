@@ -1,8 +1,8 @@
 use std::ascii::AsciiExt;
 use std::borrow::Cow;
-use std::cell::{RefCell};
+use std::cell::RefCell;
 use std::fmt::{self, Debug, Formatter};
-use std::io::{ErrorKind};
+use std::io::ErrorKind;
 use std::rc::Rc;
 use std::result;
 
@@ -13,7 +13,7 @@ use super::{Result, Error};
 use super::feature::{FeatureKind, FEATURE_KIND_COUNT};
 
 
-pub trait Extension : Debug {
+pub trait Extension: Debug {
     fn extension_code(&self) -> u32;
     fn read(&mut self, io: &mut ReadInt) -> Result<()>;
     fn validate(&mut self) -> Result<()> {
@@ -37,7 +37,10 @@ pub struct UnknownExtension {
 }
 impl UnknownExtension {
     pub fn new(code: u32) -> Self {
-        UnknownExtension { code: code, data: vec![] }
+        UnknownExtension {
+            code: code,
+            data: vec![],
+        }
     }
 }
 impl Extension for UnknownExtension {
@@ -91,12 +94,17 @@ impl Extension for FeatureNameTable {
 
                     try!(io.read_exact(&mut buf));
                     // Remove trailing zero bytes from name.
-                    let chars = buf.into_iter().take_while(|&&c| c != 0)
-                        .map(|&c| c).collect::<Vec<_>>();
+                    let chars = buf.into_iter()
+                        .take_while(|&&c| c != 0)
+                        .map(|&c| c)
+                        .collect::<Vec<_>>();
                     // Error on non-ASCII characters, are those supported?
                     match chars.iter().find(|c| !c.is_ascii()) {
-                        None => {},
-                        Some(_) => return Err(Error::FileFormat("unsafe characters in feature name table".to_owned()))
+                        None => {}
+                        Some(_) => {
+                            return Err(Error::FileFormat("unsafe characters in feature name table"
+                                .to_owned()))
+                        }
                     }
                     // This can't fail!
                     let name = String::from_utf8(chars).unwrap();
@@ -105,7 +113,7 @@ impl Extension for FeatureNameTable {
                         bit: bit,
                         name: name,
                     });
-                },
+                }
             }
         }
         Ok(())
@@ -113,10 +121,12 @@ impl Extension for FeatureNameTable {
     fn validate(&mut self) -> Result<()> {
         for n in &self.0 {
             if n.kind >= FEATURE_KIND_COUNT as u8 {
-                return Err(Error::FileFormat("unknown feature type in feature name table".to_owned()));
+                return Err(Error::FileFormat("unknown feature type in feature name table"
+                    .to_owned()));
             }
             if n.bit > 63 {
-                return Err(Error::FileFormat("bit number too high in feature name table".to_owned()));
+                return Err(Error::FileFormat("bit number too high in feature name table"
+                    .to_owned()));
             }
         }
         Ok(())
