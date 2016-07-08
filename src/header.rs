@@ -100,7 +100,7 @@ impl Debug for HeaderV3 {
             .field("header_length", &self.header_length)
             .field("feature_name_table", &self.feature_name_table.borrow())
             .field("backing_file_name", &self.backing_file_name)
-            .field("extensions", &DebugExtensions(&self.extensions))
+            .field("unknown extensions", &DebugExtensions(&self.extensions))
             .finish()
     }
 }
@@ -204,7 +204,7 @@ impl Header {
             let len = try!(io.read_u32()) as u64;
             if len + io.position() > self.cluster_size() {
                 // Don't try to read too much dynamic data!
-                return Err(Error::FileFormat(format!("complete header too big for first cluster")))
+                return Err(Error::FileFormat(format!("complete header too big for first cluster")));
             }
             let ext;
             {
