@@ -1,6 +1,6 @@
 use std::ascii::AsciiExt;
 use std::borrow::Cow;
-use std::cell::{RefCell, Ref, RefMut};
+use std::cell::{RefCell};
 use std::fmt::{self, Debug, Formatter};
 use std::io::{ErrorKind};
 use std::rc::Rc;

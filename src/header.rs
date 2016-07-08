@@ -1,8 +1,9 @@
-use std::cell::{RefCell, Ref, RefMut};
+use std::cell::{RefCell, Ref};
+use std::collections::HashSet;
 use std::fmt::{self, Debug, Formatter};
 use std::io::{self, Read};
 use std::mem::size_of;
-use std::ops::{Deref, DerefMut};
+use std::ops::{DerefMut};
 use std::rc::Rc;
 use std::result;
 
@@ -38,9 +39,13 @@ pub struct HeaderCommon {
     pub snapshots_offset: u64,
 }
 
+#[allow(dead_code)]
 const INCOMPATIBLE_DIRTY: u64 = 0b1;
+#[allow(dead_code)]
 const INCOMPATIBLE_CORRUPT: u64 = 0b10;
+#[allow(dead_code)]
 const COMPATIBLE_LAZY_REFCOUNTS: u64 = 0b1;
+#[allow(dead_code)]
 const AUTOCLEAR_BITMAPS: u64 = 0b1;
 
 static INCOMPATIBLE_NAMES: &'static [&'static str] = &["dirty", "corrupt"];
@@ -88,7 +93,7 @@ impl Debug for HeaderV3 {
         .field("autoclear", &self.autoclear.debug(&self.feature_name_table()))
         .field("refcount_order", &self.refcount_order)
         .field("header_length", &self.header_length)
-        .field("feature_name_table", &self.feature_name_table)
+        .field("feature_name_table", &self.feature_name_table.borrow())
         .field("backing_file_name", &self.backing_file_name)
         .field("extensions", &DebugExtensions(&self.extensions))
             .finish()
@@ -178,11 +183,18 @@ impl Header {
         self.v3.header_length = try!(io.read_u32());
 
         // Read extensions.
+        let mut seen = HashSet::<u32>::new();
         loop {
             let ext_code = try!(io.read_u32());
             if ext_code == 0 {
                 break;
             }
+
+            // No duplicates allowed
+            if seen.contains(&ext_code) {
+                return Err(Error::FileFormat(format!("Duplicate header extension {:#x}", ext_code)));
+            }
+            seen.insert(ext_code);
 
             let len = try!(io.read_u32()) as u64;
             let ext;
@@ -191,14 +203,19 @@ impl Header {
                 let mut sub = ByteIo::<_, BigEndian>::new(take);
                 ext = self.v3.extension(ext_code);
                 try!(ext.borrow_mut().read(&mut sub));
+
+                // Verify all is read.
+                let remain = sub.bytes().count();
+                if remain > 0 {
+                    return Err(Error::FileFormat(
+                        format!("{} bytes left after reading extension {:#x}", remain, ext_code)));
+                }
             }
 
-            // TODO: verify all is read.
             // Read padding.
             let mut pad = vec![0; len.padding_to_multiple(8) as usize];
             try!(io.read_exact(&mut pad));
         }
-        // TODO: verify we don't see the same one twice
         Ok(())
     }
 
