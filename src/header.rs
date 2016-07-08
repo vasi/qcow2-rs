@@ -202,6 +202,10 @@ impl Header {
             seen.insert(ext_code);
 
             let len = try!(io.read_u32()) as u64;
+            if len + io.position() > self.cluster_size() {
+                // Don't try to read too much dynamic data!
+                return Err(Error::FileFormat(format!("complete header too big for first cluster")))
+            }
             let ext;
             {
                 let take = io.take(len);
