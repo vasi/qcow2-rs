@@ -19,7 +19,6 @@ pub trait Extension: Debug {
     fn validate(&mut self) -> Result<()> {
         Ok(())
     }
-    // TODO: write
 }
 
 pub struct DebugExtensions<'a>(pub &'a Vec<Rc<RefCell<Extension>>>);

@@ -178,12 +178,19 @@ impl Header {
     }
 
     // Read the version 3 header.
-    fn read_v3<I: Read>(&mut self, io: &mut ByteIo<I, BigEndian>) -> Result<()> {
+    fn read_v3<I: ReadAt>(&mut self, io: &mut ByteIo<Cursor<I>, BigEndian>) -> Result<()> {
         self.v3.incompatible.set(try!(io.read_u64()));
         self.v3.compatible.set(try!(io.read_u64()));
         self.v3.autoclear.set(try!(io.read_u64()));
         self.v3.refcount_order = try!(io.read_u32());
         self.v3.header_length = try!(io.read_u32());
+
+        // Need to verify header_length here, so we can get current position.
+        if self.v3.header_length as u64 != io.position() {
+            return Err(Error::FileFormat(format!("header is {} bytes, file claims {}",
+                                                 io.position(),
+                                                 self.v3.header_length)));
+        }
 
         // Read extensions.
         let mut seen = HashSet::<u32>::new();
@@ -195,7 +202,7 @@ impl Header {
 
             // No duplicates allowed
             if seen.contains(&ext_code) {
-                return Err(Error::FileFormat(format!("Duplicate header extension {:#x}",
+                return Err(Error::FileFormat(format!("duplicate header extension {:#x}",
                                                      ext_code)));
             }
             seen.insert(ext_code);
@@ -233,8 +240,8 @@ impl Header {
     pub fn read<I: ReadAt>(&mut self, io: &mut ByteIo<I, BigEndian>) -> Result<()> {
         // The headers are best read sequentially, rather than positioned.
         // So get a sequential cursor to read from.
-        let mut curs = Cursor::new(io.deref_mut());
-        let mut io: ByteIo<_, BigEndian> = ByteIo::new(&mut curs);
+        let curs = Cursor::new(io.deref_mut());
+        let mut io: ByteIo<_, BigEndian> = ByteIo::new(curs);
 
         // Read the header.
         try!(self.read_common(&mut io));
