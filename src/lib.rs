@@ -4,13 +4,13 @@ use byteorder::BigEndian;
 extern crate positioned_io;
 use positioned_io::{ReadAt, ByteIo};
 
-extern crate num;
+#[macro_use]
+extern crate bitflags;
 
 use std::fmt::{self, Debug, Formatter};
 use std::result;
 
 mod error;
-mod features;
 mod header;
 mod int;
 pub use error::Error;

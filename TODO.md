@@ -1,7 +1,5 @@
 * finish v3 header
-  * better display of features, extensions
-  * better handling of features
-  * validation!
+  * features bitmaps
   * extensions
   * feature names
   * check header length

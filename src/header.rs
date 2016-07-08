@@ -1,17 +1,19 @@
+extern crate byteorder;
 use byteorder::BigEndian;
+
+extern crate positioned_io;
 use positioned_io::{ByteIo, ReadAt, Cursor};
-use num::Integer as NumInteger;
+
+extern crate num;
+use self::num::Integer as NumInteger;
 
 use super::{Result, Error};
 use super::int::Integer;
-use super::features::Features;
 
 use std::collections::HashMap;
-use std::fmt::Debug;
 use std::io::{self, Read};
 use std::mem::size_of;
 use std::ops::DerefMut;
-use std::rc::Rc;
 
 
 const MAGIC: u32 = 0x514649fb;
@@ -36,18 +38,40 @@ pub struct HeaderCommon {
     pub snapshots_offset: u64,
 }
 
-pub trait HeaderExtension : Debug {
-    fn identifier(&self) -> u32;
-    fn read_extension(&mut self, buf: &[u8]) -> Result<()>;
-    // TODO: write
+bitflags! {
+    #[derive(Default)]
+    pub flags Incompatible: u64 {
+        const DIRTY = 1 << 0,
+        const CORRUPT = 1 << 1,
+    }
 }
-
+bitflags! {
+    #[derive(Default)]
+    pub flags Compatible: u64 {
+        const LAZY_REFCOUNTS = 1 << 0,
+    }
+}
+bitflags! {
+    #[derive(Default)]
+    pub flags AutoClear: u64 {
+        const BITMAPS_EXTENSION = 1 << 0,
+    }
+}
+enum HeaderExtension {
+    End = 0,
+    BackingFileFormatName = 0xE2792ACA,
+    FeatureNameTable = 0x6803f857,
+    BitMaps = 0x23852875,
+}
 #[derive(Default, Debug)]
 pub struct HeaderV3 {
-    pub known_extensions: HashMap<u32, Box<HeaderExtension>>,
+    // We store these raw, so we can easily re-write them, and use bits that are unknown.
+    pub compatible: u64,
+    pub incompatible: u64,
+    pub autoclear: u64,
     pub refcount_order: u32,
     pub header_length: u32,
-    pub unknown_extensions: HashMap<u32, Vec<u8>>,
+    pub extensions: HashMap<u32, Vec<u8>>,
 
     // TODO: Once we support backing files, read/write this.
     pub backing_file_name: String,
@@ -111,36 +135,26 @@ impl Header {
         Ok(())
     }
 
-    fn extensions(&mut self) -> Vec<Rc<HeaderExtension>> {
-        vec![Rc::new(&mut self.v3.features)]
-    }
-
     // Read the version 3 header.
     fn read_v3<I: Read>(&mut self, io: &mut ByteIo<I, BigEndian>) -> Result<()> {
-        try!(self.v3.features.read(io));
+        self.v3.incompatible = try!(io.read_u64());
+        self.v3.compatible = try!(io.read_u64());
+        self.v3.autoclear = try!(io.read_u64());
         self.v3.refcount_order = try!(io.read_u32());
         self.v3.header_length = try!(io.read_u32());
+
+        self.v3.extensions = HashMap::new();
         loop {
             let extid = try!(io.read_u32());
-            if extid == 0 {
+            if extid == HeaderExtension::End as u32 {
                 break;
             }
 
-            // Read the data.
             let len = try!(io.read_u32()) as usize;
             let mut buf = vec![0; len.to_multiple_of(8)];
             try!(io.read_exact(&mut buf));
             buf.truncate(len);
-
-            // Look for a handler.
-            for ext in self.extensions() {
-
-            }
-            // match extid {
-            //     HeaderExtension::FeatureNameTable as u32 => try!(self.v3.features.read_names(buf)),
-            //     _ => { self.v3.unknown_extensions.insert(extid, buf); () }
-            // }
-
+            self.v3.extensions.insert(extid, buf);
         }
         Ok(())
     }

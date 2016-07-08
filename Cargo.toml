@@ -7,3 +7,4 @@ authors = ["Dave Vasilevsky <dave@vasilevsky.ca>"]
 byteorder = "0.5"
 positioned-io = "0.1.0"
 num = "0.1"
+bitflags = "0.7"
