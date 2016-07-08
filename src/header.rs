@@ -2,7 +2,7 @@ extern crate byteorder;
 use byteorder::BigEndian;
 
 extern crate positioned_io;
-use positioned_io::{ByteIo, ReadAt, Cursor};
+use positioned_io::{ByteIo, ReadAt, ReadInt, Cursor};
 
 extern crate num;
 use self::num::Integer as NumInteger;
