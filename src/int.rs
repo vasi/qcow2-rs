@@ -1,4 +1,4 @@
-extern crate num;
+use num;
 
 pub trait Integer : num::Integer + Copy {
     // Divide, rounding up.

@@ -1,9 +1,10 @@
 extern crate qcow2;
-use qcow2::Qcow2;
 
 use std::error::Error;
 use std::env::args;
 use std::fs::File;
+
+use qcow2::Qcow2;
 
 fn run() -> Result<Qcow2<File>, Box<Error>> {
     let mut args = args();

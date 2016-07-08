@@ -1,23 +1,23 @@
-extern crate byteorder;
+use std::cell::RefCell;
+use std::fmt::{self, Debug, Formatter};
+use std::io::{self, Read};
+use std::mem::size_of;
+use std::ops::{Deref, DerefMut};
+use std::rc::Rc;
+use std::result;
+
 use byteorder::BigEndian;
-
-extern crate positioned_io;
+use num::Integer as NumInteger;
 use positioned_io::{ByteIo, ReadAt, ReadInt, Cursor};
-
-extern crate num;
-use self::num::Integer as NumInteger;
 
 use super::{Result, Error};
 use super::int::Integer;
-
-use std::collections::HashMap;
-use std::io::{self, Read};
-use std::mem::size_of;
-use std::ops::DerefMut;
-
+use super::extension::{Extension,FeatureNameTable};
+use super::feature::{Feature, FeatureKind};
 
 const MAGIC: u32 = 0x514649fb;
 const SUPPORTED_VERSION: u32 = 3;
+
 
 // Common header for all versions.
 #[repr(C)]
@@ -38,44 +38,56 @@ pub struct HeaderCommon {
     pub snapshots_offset: u64,
 }
 
-bitflags! {
-    #[derive(Default)]
-    pub flags Incompatible: u64 {
-        const DIRTY = 1 << 0,
-        const CORRUPT = 1 << 1,
-    }
-}
-bitflags! {
-    #[derive(Default)]
-    pub flags Compatible: u64 {
-        const LAZY_REFCOUNTS = 1 << 0,
-    }
-}
-bitflags! {
-    #[derive(Default)]
-    pub flags AutoClear: u64 {
-        const BITMAPS_EXTENSION = 1 << 0,
-    }
-}
-enum HeaderExtension {
-    End = 0,
-    BackingFileFormatName = 0xE2792ACA,
-    FeatureNameTable = 0x6803f857,
-    BitMaps = 0x23852875,
-}
-#[derive(Default, Debug)]
+const INCOMPATIBLE_DIRTY: u64 = 0b1;
+const INCOMPATIBLE_CORRUPT: u64 = 0b10;
+const COMPATIBLE_LAZY_REFCOUNTS: u64 = 0b1;
+const AUTOCLEAR_BITMAPS: u64 = 0b1;
+
+static INCOMPATIBLE_NAMES: &'static [&'static str] = &["dirty", "corrupt"];
+static COMPATIBLE_NAMES: &'static [&'static str] = &["lazy refcounts"];
+static AUTOCLEAR_NAMES: &'static [&'static str] = &["bitmaps"];
+
 pub struct HeaderV3 {
-    // We store these raw, so we can easily re-write them, and use bits that are unknown.
-    pub compatible: u64,
-    pub incompatible: u64,
-    pub autoclear: u64,
+    pub incompatible: Feature,
+    pub compatible: Feature,
+    pub autoclear: Feature,
+
     pub refcount_order: u32,
     pub header_length: u32,
-    pub extensions: HashMap<u32, Vec<u8>>,
+
+    pub feature_name_table: FeatureNameTable,
+    // pub extensions: ...,
 
     // TODO: Once we support backing files, read/write this.
     pub backing_file_name: String,
 }
+impl Debug for HeaderV3 {
+    fn fmt(&self, fmt: &mut Formatter) -> result::Result<(), fmt::Error> {
+        fmt.debug_struct("HeaderV3")
+        .field("incompatible", &self.incompatible.debug(&self.feature_name_table))
+        .field("compatible", &self.incompatible.debug(&self.feature_name_table))
+        .field("autoclear", &self.incompatible.debug(&self.feature_name_table))
+        .field("refcount_order", &self.refcount_order)
+        .field("header_length", &self.header_length)
+        .field("feature_name_table", &self.feature_name_table)
+        .field("backing_file_name", &self.backing_file_name)
+            .finish()
+    }
+}
+impl Default for HeaderV3 {
+    fn default() -> Self {
+        HeaderV3 {
+            incompatible: Feature::new(FeatureKind::Incompatible, INCOMPATIBLE_NAMES),
+            compatible: Feature::new(FeatureKind::Compatible, COMPATIBLE_NAMES),
+            autoclear: Feature::new(FeatureKind::Autoclear, AUTOCLEAR_NAMES),
+            refcount_order: 0,
+            header_length: 0,
+            backing_file_name: String::new(),
+            feature_name_table: FeatureNameTable::default(),
+        }
+    }
+}
+
 
 #[derive(Default, Debug)]
 pub struct Header {
@@ -137,25 +149,31 @@ impl Header {
 
     // Read the version 3 header.
     fn read_v3<I: Read>(&mut self, io: &mut ByteIo<I, BigEndian>) -> Result<()> {
-        self.v3.incompatible = try!(io.read_u64());
-        self.v3.compatible = try!(io.read_u64());
-        self.v3.autoclear = try!(io.read_u64());
+        self.v3.incompatible.set(try!(io.read_u64()));
+        self.v3.compatible.set(try!(io.read_u64()));
+        self.v3.autoclear.set(try!(io.read_u64()));
         self.v3.refcount_order = try!(io.read_u32());
         self.v3.header_length = try!(io.read_u32());
 
-        self.v3.extensions = HashMap::new();
-        loop {
-            let extid = try!(io.read_u32());
-            if extid == HeaderExtension::End as u32 {
-                break;
-            }
+        // TODO
+        // self.v3.extensions = HashMap::new();
+        // loop {
+        //     let extid = try!(io.read_u32());
+        //     if extid == 0 {
+        //         break;
+        //     }
+        //
+        //     let len = try!(io.read_u32()) as usize;
+        //     let mut buf = vec![0; len.to_multiple_of(8)];
+        //     try!(io.read_exact(&mut buf));
+        //     buf.truncate(len);
+        //     self.v3.extensions.insert(extid, buf);
+        // }
+        Ok(())
+    }
 
-            let len = try!(io.read_u32()) as usize;
-            let mut buf = vec![0; len.to_multiple_of(8)];
-            try!(io.read_exact(&mut buf));
-            buf.truncate(len);
-            self.v3.extensions.insert(extid, buf);
-        }
+    fn validate_v3(&mut self) -> Result<()> {
+        // TODO
         Ok(())
     }
 
@@ -169,6 +187,7 @@ impl Header {
         try!(self.read_common(&mut io));
         try!(self.validate_common());
         try!(self.read_v3(&mut io));
+        try!(self.validate_v3());
         Ok(())
     }
 

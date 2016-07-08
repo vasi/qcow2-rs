@@ -1,19 +1,20 @@
 extern crate byteorder;
-use byteorder::BigEndian;
-
 extern crate positioned_io;
-use positioned_io::{ReadAt, ByteIo};
+extern crate num;
 
-#[macro_use]
-extern crate bitflags;
+mod error;
+mod extension;
+mod feature;
+mod header;
+mod int;
+pub use error::Error;
 
 use std::fmt::{self, Debug, Formatter};
 use std::result;
 
-mod error;
-mod header;
-mod int;
-pub use error::Error;
+use byteorder::BigEndian;
+use positioned_io::{ReadAt, ByteIo};
+
 
 pub struct Qcow2<I>
     where I: ReadAt
