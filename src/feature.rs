@@ -38,7 +38,7 @@ impl Feature {
         self.bits &= !bit
     }
 
-    pub fn have(&self, bit: u64) -> bool {
+    pub fn enabled(&self, bit: u64) -> bool {
         (self.bits & bit) != 0
     }
     pub fn bits(&self) -> u64 {
@@ -58,7 +58,7 @@ impl Feature {
         if unknown.bits() == 0 {
             Ok(())
         } else {
-            Err(Error::UnsupportedFeature(format!("{:?}", self.debug(table))))
+            Err(Error::UnsupportedFeature(format!("{:?}", unknown.debug(table))))
         }
     }
 

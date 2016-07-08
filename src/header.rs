@@ -1,7 +1,7 @@
 use std::cell::{RefCell, Ref};
 use std::collections::HashSet;
 use std::fmt::{self, Debug, Formatter};
-use std::io::{self, Read};
+use std::io::Read;
 use std::mem::size_of;
 use std::ops::DerefMut;
 use std::rc::Rc;
@@ -51,6 +51,8 @@ const AUTOCLEAR_BITMAPS: u64 = 0b1;
 static INCOMPATIBLE_NAMES: &'static [&'static str] = &["dirty", "corrupt"];
 static COMPATIBLE_NAMES: &'static [&'static str] = &["lazy refcounts"];
 static AUTOCLEAR_NAMES: &'static [&'static str] = &["bitmaps"];
+
+const HEADER_LENGTH_V3: usize = 104;
 
 pub struct HeaderV3 {
     pub incompatible: Feature,
@@ -127,7 +129,7 @@ pub struct Header {
 
 impl Header {
     // Read the common header.
-    fn read_common<I: Read>(&mut self, io: &mut ByteIo<I, BigEndian>) -> io::Result<()> {
+    fn read_common<I: Read>(&mut self, io: &mut ByteIo<I, BigEndian>) -> Result<()> {
         self.c.magic = try!(io.read_u32());
         self.c.version = try!(io.read_u32());
         self.c.backing_file_offset = try!(io.read_u64());
@@ -141,11 +143,8 @@ impl Header {
         self.c.refcount_table_clusters = try!(io.read_u32());
         self.c.nb_snapshots = try!(io.read_u32());
         self.c.snapshots_offset = try!(io.read_u64());
-        Ok(())
-    }
 
-    // Validate the common header.
-    fn validate_common(&self) -> Result<()> {
+        // Validation.
         if self.c.magic != MAGIC {
             return Err(Error::FileType);
         }
@@ -185,12 +184,7 @@ impl Header {
         self.v3.refcount_order = try!(io.read_u32());
         self.v3.header_length = try!(io.read_u32());
 
-        // Need to verify header_length here, so we can get current position.
-        if self.v3.header_length as u64 != io.position() {
-            return Err(Error::FileFormat(format!("header is {} bytes, file claims {}",
-                                                 io.position(),
-                                                 self.v3.header_length)));
-        }
+        let actual_length = io.position();
 
         // Read extensions.
         let mut seen = HashSet::<u32>::new();
@@ -229,11 +223,26 @@ impl Header {
             let mut pad = vec![0; len.padding_to_multiple(8) as usize];
             try!(io.read_exact(&mut pad));
         }
-        Ok(())
-    }
 
-    fn validate_v3(&mut self) -> Result<()> {
-        // TODO
+        // Validation.
+        if self.v3.incompatible.enabled(INCOMPATIBLE_CORRUPT) {
+            return Err(Error::UnsupportedFeature("corrupt bit".to_owned()));
+        }
+        try!(self.v3.incompatible.ensure_known(&self.v3.feature_name_table()));
+        if self.v3.refcount_order > 6 {
+            return Err(Error::FileFormat(format!("bad refcount_order {}", self.v3.refcount_order)));
+        }
+        if self.v3.header_length as u64 != actual_length {
+            return Err(Error::FileFormat(format!("header is {} bytes, file claims {}",
+                                                 io.position(),
+                                                 self.v3.header_length)));
+        }
+        if actual_length != HEADER_LENGTH_V3 as u64 {
+            return Err(Error::Internal(format!("header must be {} bytes, but we read {}",
+                                               HEADER_LENGTH_V3,
+                                               io.position())));
+        }
+
         Ok(())
     }
 
@@ -245,9 +254,7 @@ impl Header {
 
         // Read the header.
         try!(self.read_common(&mut io));
-        try!(self.validate_common());
         try!(self.read_v3(&mut io));
-        try!(self.validate_v3());
         Ok(())
     }
 

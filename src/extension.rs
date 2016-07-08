@@ -16,9 +16,6 @@ use super::feature::{FeatureKind, FEATURE_KIND_COUNT};
 pub trait Extension: Debug {
     fn extension_code(&self) -> u32;
     fn read(&mut self, io: &mut ReadInt) -> Result<()>;
-    fn validate(&mut self) -> Result<()> {
-        Ok(())
-    }
 }
 
 pub struct DebugExtensions<'a>(pub &'a Vec<Rc<RefCell<Extension>>>);
@@ -88,9 +85,18 @@ impl Extension for FeatureNameTable {
                 Err(ref e) if e.kind() == ErrorKind::UnexpectedEof => break,
                 Err(e) => return Err(Error::Io(e)),
                 Ok(kind) => {
-                    let bit = try!(io.read_u8());
-                    let mut buf = [0; 46];
+                    if kind >= FEATURE_KIND_COUNT as u8 {
+                        return Err(Error::FileFormat("unknown feature type in feature name table"
+                            .to_owned()));
+                    }
 
+                    let bit = try!(io.read_u8());
+                    if bit > 63 {
+                        return Err(Error::FileFormat("bit number too high in feature name table"
+                            .to_owned()));
+                    }
+
+                    let mut buf = [0; 46];
                     try!(io.read_exact(&mut buf));
                     // Remove trailing zero bytes from name.
                     let chars = buf.into_iter()
@@ -113,19 +119,6 @@ impl Extension for FeatureNameTable {
                         name: name,
                     });
                 }
-            }
-        }
-        Ok(())
-    }
-    fn validate(&mut self) -> Result<()> {
-        for n in &self.0 {
-            if n.kind >= FEATURE_KIND_COUNT as u8 {
-                return Err(Error::FileFormat("unknown feature type in feature name table"
-                    .to_owned()));
-            }
-            if n.bit > 63 {
-                return Err(Error::FileFormat("bit number too high in feature name table"
-                    .to_owned()));
             }
         }
         Ok(())
