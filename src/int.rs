@@ -18,6 +18,15 @@ pub trait Integer : num::Integer + Copy {
         }
         self + (other - m)
     }
+
+    // Get the amount to add to get a multiple of `other`.
+    fn padding_to_multiple(self, other: Self) -> Self {
+        let m = self % other;
+        if m.is_zero() {
+            return Self::zero();
+        }
+        other - m
+    }
 }
 
 impl Integer for u64 {}

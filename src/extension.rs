@@ -1,6 +1,10 @@
 use std::ascii::AsciiExt;
 use std::borrow::Cow;
+use std::cell::{RefCell, Ref, RefMut};
+use std::fmt::{self, Debug, Formatter};
 use std::io::{ErrorKind};
+use std::rc::Rc;
+use std::result;
 
 use byteorder::ReadBytesExt;
 use positioned_io::ReadInt;
@@ -9,13 +13,49 @@ use super::{Result, Error};
 use super::feature::{FeatureKind, FEATURE_KIND_COUNT};
 
 
-pub trait Extension {
+pub trait Extension : Debug {
     fn extension_code(&self) -> u32;
     fn read(&mut self, io: &mut ReadInt) -> Result<()>;
     fn validate(&mut self) -> Result<()> {
         Ok(())
     }
     // TODO: write
+}
+
+pub struct DebugExtensions<'a>(pub &'a Vec<Rc<RefCell<Extension>>>);
+impl<'a> Debug for DebugExtensions<'a> {
+    fn fmt(&self, fmt: &mut Formatter) -> result::Result<(), fmt::Error> {
+        fmt.debug_list()
+            .entries(self.0.iter().map(|e| e.borrow()).filter(|e| e.extension_code() == 0))
+            .finish()
+    }
+}
+
+pub struct UnknownExtension {
+    code: u32,
+    data: Vec<u8>,
+}
+impl UnknownExtension {
+    pub fn new(code: u32) -> Self {
+        UnknownExtension { code: code, data: vec![] }
+    }
+}
+impl Extension for UnknownExtension {
+    fn extension_code(&self) -> u32 {
+        0
+    }
+    fn read(&mut self, io: &mut ReadInt) -> Result<()> {
+        try!(io.read_to_end(&mut self.data));
+        Ok(())
+    }
+}
+impl Debug for UnknownExtension {
+    fn fmt(&self, fmt: &mut Formatter) -> result::Result<(), fmt::Error> {
+        fmt.debug_struct("UnknownExtension")
+            .field("code", &format!("{:#x}", &self.code))
+            .field("size", &self.data.len())
+            .finish()
+    }
 }
 
 #[derive(Debug)]
@@ -51,13 +91,15 @@ impl Extension for FeatureNameTable {
 
                     try!(io.read_exact(&mut buf));
                     // Remove trailing zero bytes from name.
-                    let mut chars = buf.into_iter().take_while(|&&c| c != 0);
+                    let chars = buf.into_iter().take_while(|&&c| c != 0)
+                        .map(|&c| c).collect::<Vec<_>>();
                     // Error on non-ASCII characters, are those supported?
-                    match chars.find(|c| !c.is_ascii()) {
+                    match chars.iter().find(|c| !c.is_ascii()) {
                         None => {},
                         Some(_) => return Err(Error::FileFormat("unsafe characters in feature name table".to_owned()))
                     }
-                    let name = chars.map(|&c| c as char).collect::<String>();
+                    // This can't fail!
+                    let name = String::from_utf8(chars).unwrap();
                     self.0.push(FeatureName {
                         kind: kind,
                         bit: bit,

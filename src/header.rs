@@ -1,4 +1,4 @@
-use std::cell::RefCell;
+use std::cell::{RefCell, Ref, RefMut};
 use std::fmt::{self, Debug, Formatter};
 use std::io::{self, Read};
 use std::mem::size_of;
@@ -12,7 +12,7 @@ use positioned_io::{ByteIo, ReadAt, ReadInt, Cursor};
 
 use super::{Result, Error};
 use super::int::Integer;
-use super::extension::{Extension,FeatureNameTable};
+use super::extension::{Extension, FeatureNameTable, UnknownExtension, DebugExtensions};
 use super::feature::{Feature, FeatureKind};
 
 const MAGIC: u32 = 0x514649fb;
@@ -55,27 +55,48 @@ pub struct HeaderV3 {
     pub refcount_order: u32,
     pub header_length: u32,
 
-    pub feature_name_table: FeatureNameTable,
-    // pub extensions: ...,
+    pub feature_name_table: Rc<RefCell<FeatureNameTable>>,
+    pub extensions: Vec<Rc<RefCell<Extension>>>,
 
     // TODO: Once we support backing files, read/write this.
     pub backing_file_name: String,
 }
+impl HeaderV3 {
+    pub fn feature_name_table(&self) -> Ref<FeatureNameTable> {
+        self.feature_name_table.borrow()
+    }
+
+    // Get an extension by extension code. If we can't find one, use UnknownExtension.
+    pub fn extension(&mut self, code: u32) -> Rc<RefCell<Extension>> {
+        for r in &self.extensions {
+            let e = r.borrow();
+            if e.extension_code() == code {
+                return r.clone();
+            }
+        }
+
+        let u = Rc::new(RefCell::new(UnknownExtension::new(code)));
+        self.extensions.push(u.clone());
+        u
+    }
+}
 impl Debug for HeaderV3 {
     fn fmt(&self, fmt: &mut Formatter) -> result::Result<(), fmt::Error> {
         fmt.debug_struct("HeaderV3")
-        .field("incompatible", &self.incompatible.debug(&self.feature_name_table))
-        .field("compatible", &self.incompatible.debug(&self.feature_name_table))
-        .field("autoclear", &self.incompatible.debug(&self.feature_name_table))
+        .field("incompatible", &self.incompatible.debug(&self.feature_name_table()))
+        .field("compatible", &self.compatible.debug(&self.feature_name_table()))
+        .field("autoclear", &self.autoclear.debug(&self.feature_name_table()))
         .field("refcount_order", &self.refcount_order)
         .field("header_length", &self.header_length)
         .field("feature_name_table", &self.feature_name_table)
         .field("backing_file_name", &self.backing_file_name)
+        .field("extensions", &DebugExtensions(&self.extensions))
             .finish()
     }
 }
 impl Default for HeaderV3 {
     fn default() -> Self {
+        let feature_name_table = Rc::new(RefCell::new(FeatureNameTable::default()));
         HeaderV3 {
             incompatible: Feature::new(FeatureKind::Incompatible, INCOMPATIBLE_NAMES),
             compatible: Feature::new(FeatureKind::Compatible, COMPATIBLE_NAMES),
@@ -83,7 +104,8 @@ impl Default for HeaderV3 {
             refcount_order: 0,
             header_length: 0,
             backing_file_name: String::new(),
-            feature_name_table: FeatureNameTable::default(),
+            feature_name_table: feature_name_table.clone(),
+            extensions: vec![feature_name_table.clone()],
         }
     }
 }
@@ -155,20 +177,28 @@ impl Header {
         self.v3.refcount_order = try!(io.read_u32());
         self.v3.header_length = try!(io.read_u32());
 
-        // TODO
-        // self.v3.extensions = HashMap::new();
-        // loop {
-        //     let extid = try!(io.read_u32());
-        //     if extid == 0 {
-        //         break;
-        //     }
-        //
-        //     let len = try!(io.read_u32()) as usize;
-        //     let mut buf = vec![0; len.to_multiple_of(8)];
-        //     try!(io.read_exact(&mut buf));
-        //     buf.truncate(len);
-        //     self.v3.extensions.insert(extid, buf);
-        // }
+        // Read extensions.
+        loop {
+            let ext_code = try!(io.read_u32());
+            if ext_code == 0 {
+                break;
+            }
+
+            let len = try!(io.read_u32()) as u64;
+            let ext;
+            {
+                let take = io.take(len);
+                let mut sub = ByteIo::<_, BigEndian>::new(take);
+                ext = self.v3.extension(ext_code);
+                try!(ext.borrow_mut().read(&mut sub));
+            }
+
+            // TODO: verify all is read.
+            // Read padding.
+            let mut pad = vec![0; len.padding_to_multiple(8) as usize];
+            try!(io.read_exact(&mut pad));
+        }
+        // TODO: verify we don't see the same one twice
         Ok(())
     }
 
