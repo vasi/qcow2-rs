@@ -140,7 +140,7 @@ impl Header {
             return Err(Error::Version(self.c.version, SUPPORTED_VERSION));
         }
         if self.c.backing_file_offset != 0 {
-            // TODO: return Err(Error::UnsupportedFeature("backing file".to_owned()));
+            return Err(Error::UnsupportedFeature("backing file".to_owned()));
             if self.c.backing_file_offset > self.cluster_size() {
                 return Err(Error::FileFormat("backing file name not in first cluster".to_owned()));
             }
