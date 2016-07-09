@@ -4,7 +4,7 @@ use std::mem::size_of;
 use std::ops::Deref;
 
 use byteorder::BigEndian;
-use positioned_io::{ByteIo, ReadAt, ReadIntAt};
+use positioned_io::{ByteIo, ReadAt, ReadIntAt, Size};
 
 use super::{Error, Qcow2, Qcow2Priv, Result};
 
@@ -105,7 +105,7 @@ impl<I> Qcow2<I>
         let l1_entry = try!(self.l1_entry_read(l1, l1_l2_idx));
         Ok(match l1_entry {
             L1Entry::Empty => L2Entry::Empty,
-            L1Entry::Standard{pos, ..} => {
+            L1Entry::Standard { pos, .. } => {
                 let raw = try!(self.l2_entry_read_raw(pos, l2_block_idx));
                 try!(self.l2_entry_parse(raw))
             }
@@ -119,21 +119,23 @@ impl<I> Qcow2<I>
     fn guest_block_read(&self, entry: L2Entry, offset: u64, buf: &mut [u8]) -> Result<()> {
         match entry {
             L2Entry::Empty => Self::zero_fill(buf),
-            L2Entry::Standard{pos, zero, ..} => {
+            L2Entry::Standard { pos, zero, .. } => {
                 if zero {
                     Self::zero_fill(buf)
                 } else {
                     try!(self.io.read_exact_at(pos + offset, buf))
                 }
-            },
-            L2Entry::Compressed{..} => return Err(Error::UnsupportedFeature("compressed blocks".to_owned())),
+            }
+            L2Entry::Compressed { .. } => {
+                return Err(Error::UnsupportedFeature("compressed blocks".to_owned()))
+            }
         }
         Ok(())
     }
     fn guest_read(&self, l1: &ReadIntAt, pos: u64, mut buf: &mut [u8]) -> io::Result<usize> {
         // Check for reads past EOF.
         if pos >= self.header.guest_size() {
-            return Ok(0)
+            return Ok(0);
         }
         let ret = min(buf.len() as u64, self.header.guest_size() - pos) as usize;
         let mut buf = &mut buf[..ret];
@@ -173,8 +175,18 @@ impl<'a, I: 'a + ReadAt> Reader<'a, I> {
     }
 }
 
-impl<'a, I> ReadAt for Reader<'a, I> where I: 'a + ReadAt {
+impl<'a, I> ReadAt for Reader<'a, I>
+    where I: 'a + ReadAt
+{
     fn read_at(&self, pos: u64, mut buf: &mut [u8]) -> io::Result<usize> {
         self.q.guest_read(self.l1.deref(), pos, buf)
+    }
+}
+
+impl<'a, I> Size for Reader<'a, I>
+    where I: 'a + ReadAt
+{
+    fn size(&self) -> io::Result<Option<u64>> {
+        Ok(Some(self.q.header().guest_size()))
     }
 }

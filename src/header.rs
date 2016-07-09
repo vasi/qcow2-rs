@@ -142,7 +142,8 @@ impl Header {
         if self.c.backing_file_offset != 0 {
             return Err(Error::UnsupportedFeature("backing file".to_owned()));
             // if self.c.backing_file_offset > self.cluster_size() {
-            //     return Err(Error::FileFormat("backing file name not in first cluster".to_owned()));
+            //     return Err(Error::FileFormat("backing file name not in first cluster"
+            //          .to_owned()));
             // }
             // if self.c.backing_file_size > 1023 {
             //     return Err(Error::FileFormat("backing file name size too big".to_owned()));

@@ -61,7 +61,9 @@ trait Qcow2Priv<I> {
     fn header(&self) -> &header::Header;
 }
 
-impl<I> Qcow2Priv<I> for Qcow2<I> where I: ReadAt {
+impl<I> Qcow2Priv<I> for Qcow2<I>
+    where I: ReadAt
+{
     fn io(&self) -> &ByteIo<I, BigEndian> {
         &self.io
     }
