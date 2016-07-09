@@ -1,11 +1,16 @@
 use std::cell::{RefCell, Ref};
 use std::collections::HashSet;
+use std::ffi::OsStr;
 use std::fmt::{self, Debug, Formatter};
 use std::io::Read;
 use std::mem::size_of;
 use std::ops::DerefMut;
+use std::path::PathBuf;
 use std::rc::Rc;
 use std::result;
+
+#[cfg(unix)]
+use std::os::unix::ffi::OsStrExt;
 
 use byteorder::BigEndian;
 use num::Integer as NumInteger;
@@ -65,8 +70,7 @@ pub struct HeaderV3 {
     pub feature_name_table: Rc<RefCell<FeatureNameTable>>,
     pub extensions: Vec<Rc<RefCell<Extension>>>,
 
-    // TODO: Once we support backing files, read/write this.
-    pub backing_file_name: String,
+    pub backing_file_name: PathBuf,
 }
 impl HeaderV3 {
     pub fn feature_name_table(&self) -> Ref<FeatureNameTable> {
@@ -113,7 +117,7 @@ impl Default for HeaderV3 {
             autoclear: Feature::new(FeatureKind::Autoclear, AUTOCLEAR_NAMES),
             refcount_order: 0,
             header_length: 0,
-            backing_file_name: String::new(),
+            backing_file_name: PathBuf::new(),
             feature_name_table: feature_name_table.clone(),
             extensions: vec![feature_name_table.clone()],
         }
@@ -128,23 +132,7 @@ pub struct Header {
 }
 
 impl Header {
-    // Read the common header.
-    fn read_common<I: Read>(&mut self, io: &mut ByteIo<I, BigEndian>) -> Result<()> {
-        self.c.magic = try!(io.read_u32());
-        self.c.version = try!(io.read_u32());
-        self.c.backing_file_offset = try!(io.read_u64());
-        self.c.backing_file_size = try!(io.read_u32());
-        self.c.cluster_bits = try!(io.read_u32());
-        self.c.size = try!(io.read_u64());
-        self.c.crypt_method = try!(io.read_u32());
-        self.c.l1_size = try!(io.read_u32());
-        self.c.l1_table_offset = try!(io.read_u64());
-        self.c.refcount_table_offset = try!(io.read_u64());
-        self.c.refcount_table_clusters = try!(io.read_u32());
-        self.c.nb_snapshots = try!(io.read_u32());
-        self.c.snapshots_offset = try!(io.read_u64());
-
-        // Validation.
+    fn validate_common(&self) -> Result<()> {
         if self.c.magic != MAGIC {
             return Err(Error::FileType);
         }
@@ -152,8 +140,13 @@ impl Header {
             return Err(Error::Version(self.c.version, SUPPORTED_VERSION));
         }
         if self.c.backing_file_offset != 0 {
-            return Err(Error::UnsupportedFeature("backing file".to_owned()));
-            // TODO: Validate backing file name position.
+            // TODO: return Err(Error::UnsupportedFeature("backing file".to_owned()));
+            if self.c.backing_file_offset > self.cluster_size() {
+                return Err(Error::FileFormat("backing file name not in first cluster".to_owned()));
+            }
+            if self.c.backing_file_size > 1023 {
+                return Err(Error::FileFormat("backing file name size too big".to_owned()));
+            }
         }
         if self.c.cluster_bits < 9 || self.c.cluster_bits > 22 {
             return Err(Error::FileFormat(format!("bad cluster_bits {}", self.c.cluster_bits)));
@@ -176,25 +169,31 @@ impl Header {
         Ok(())
     }
 
-    // Read the version 3 header.
-    fn read_v3<I: ReadAt>(&mut self, io: &mut ByteIo<Cursor<I>, BigEndian>) -> Result<()> {
-        self.v3.incompatible.set(try!(io.read_u64()));
-        self.v3.compatible.set(try!(io.read_u64()));
-        self.v3.autoclear.set(try!(io.read_u64()));
-        self.v3.refcount_order = try!(io.read_u32());
-        self.v3.header_length = try!(io.read_u32());
+    // Read the common header.
+    fn read_common<I: Read>(&mut self, io: &mut ByteIo<I, BigEndian>) -> Result<()> {
+        self.c.magic = try!(io.read_u32());
+        self.c.version = try!(io.read_u32());
+        self.c.backing_file_offset = try!(io.read_u64());
+        self.c.backing_file_size = try!(io.read_u32());
+        self.c.cluster_bits = try!(io.read_u32());
+        self.c.size = try!(io.read_u64());
+        self.c.crypt_method = try!(io.read_u32());
+        self.c.l1_size = try!(io.read_u32());
+        self.c.l1_table_offset = try!(io.read_u64());
+        self.c.refcount_table_offset = try!(io.read_u64());
+        self.c.refcount_table_clusters = try!(io.read_u32());
+        self.c.nb_snapshots = try!(io.read_u32());
+        self.c.snapshots_offset = try!(io.read_u64());
+        try!(self.validate_common());
+        Ok(())
+    }
 
-        let actual_length = io.position();
-
-        // Read extensions.
+    fn read_extensions<I: ReadAt>(&mut self, io: &mut ByteIo<Cursor<I>, BigEndian>) -> Result<()> {
         let mut seen = HashSet::<u32>::new();
         loop {
             let ext_code = try!(io.read_u32());
-            if ext_code == 0 {
-                break;
-            }
 
-            // No duplicates allowed
+            // No duplicates allowed.
             if seen.contains(&ext_code) {
                 return Err(Error::FileFormat(format!("duplicate header extension {:#x}",
                                                      ext_code)));
@@ -202,15 +201,18 @@ impl Header {
             seen.insert(ext_code);
 
             let len = try!(io.read_u32()) as u64;
+            if ext_code == 0 {
+                break;
+            }
+
             if len + io.position() > self.cluster_size() {
                 // Don't try to read too much dynamic data!
                 return Err(Error::FileFormat(format!("complete header too big for first cluster")));
             }
-            let ext;
             {
                 let take = io.take(len);
                 let mut sub = ByteIo::<_, BigEndian>::new(take);
-                ext = self.v3.extension(ext_code);
+                let ext = self.v3.extension(ext_code);
                 try!(ext.borrow_mut().read(&mut sub));
 
                 // Verify all is read.
@@ -226,6 +228,44 @@ impl Header {
             // Read padding.
             let mut pad = vec![0; len.padding_to_multiple(8) as usize];
             try!(io.read_exact(&mut pad));
+        }
+        Ok(())
+    }
+
+    // Read a filesystem path.
+    fn read_path<I: Read>(&mut self, io: &mut ByteIo<I, BigEndian>, len: usize) -> Result<PathBuf> {
+        let mut buf = vec![0; len];
+        try!(io.read_exact(&mut buf));
+
+        if cfg!(unix) {
+            // Paths on unix are arbitrary byte sequences.
+            Ok(From::from(OsStr::from_bytes(&buf)))
+        } else {
+            // On other platforms, who knows what to do with non-UTF8 data in there?
+            let s: String = String::from_utf8_lossy(&buf).into_owned();
+            Ok(From::from(s))
+        }
+    }
+
+    // Read the version 3 header.
+    fn read_v3<I: ReadAt>(&mut self, io: &mut ByteIo<Cursor<I>, BigEndian>) -> Result<()> {
+        self.v3.incompatible.set(try!(io.read_u64()));
+        self.v3.compatible.set(try!(io.read_u64()));
+        self.v3.autoclear.set(try!(io.read_u64()));
+        self.v3.refcount_order = try!(io.read_u32());
+        self.v3.header_length = try!(io.read_u32());
+        let actual_length = io.position();
+        try!(self.read_extensions(io));
+        if self.c.backing_file_offset != 0 {
+            println!("{}, {}", self.c.backing_file_offset, io.position());
+            if self.c.backing_file_offset != io.position() {
+                return Err(Error::FileFormat("backing file offset not consistent with extensions"
+                    .to_owned()));
+            }
+            // Need an extra copy to defeat borrow checker.
+            // See https://github.com/rust-lang/rust/issues/29975
+            let backing_file_size = self.c.backing_file_size;
+            self.v3.backing_file_name = try!(self.read_path(io, backing_file_size as usize));
         }
 
         // Validation.
