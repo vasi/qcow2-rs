@@ -12,6 +12,7 @@ use super::{Error, Qcow2, Qcow2Priv, Result};
 const L1_COW: u64 = 1 << 63;
 const L1_RESERVED: u64 = (0x7F << 56) | 0xFF;
 const L1_POS: u64 = !(L1_COW | L1_RESERVED);
+#[derive(Debug)]
 pub enum L1Entry {
     Empty,
     Standard {
@@ -26,6 +27,7 @@ const L2_ZERO: u64 = 1;
 const L2_RESERVED: u64 = (0x3F << 56) | 0xFE;
 const L2_POS: u64 = !(L2_COW | L2_COMPRESSED | L2_ZERO | L2_RESERVED);
 const L2_COMPRESSED_MASK: u64 = !(L2_COW | L2_COMPRESSED);
+#[derive(Debug)]
 pub enum L2Entry {
     Empty,
     Standard {
