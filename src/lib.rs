@@ -7,7 +7,9 @@ mod extension;
 mod feature;
 mod header;
 mod int;
+mod read;
 pub use error::Error;
+pub use read::Reader;
 
 use std::fmt::{self, Debug, Formatter};
 use std::result;
@@ -37,6 +39,10 @@ impl<I> Qcow2<I>
         try!(q.header.read(&mut q.io));
         Ok(q)
     }
+
+    fn cluster_size(&self) -> u64 {
+        self.header.cluster_size()
+    }
 }
 
 impl<I> Debug for Qcow2<I>
@@ -46,5 +52,20 @@ impl<I> Debug for Qcow2<I>
         f.debug_struct("Qcow2")
             .field("header", &self.header)
             .finish()
+    }
+}
+
+
+trait Qcow2Priv<I> {
+    fn io(&self) -> &ByteIo<I, BigEndian>;
+    fn header(&self) -> &header::Header;
+}
+
+impl<I> Qcow2Priv<I> for Qcow2<I> where I: ReadAt {
+    fn io(&self) -> &ByteIo<I, BigEndian> {
+        &self.io
+    }
+    fn header(&self) -> &header::Header {
+        &self.header
     }
 }

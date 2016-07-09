@@ -1,9 +1,10 @@
-use std;
 use std::error::Error as StdError;
+use std::fmt::{self, Display, Formatter};
+use std::io::{self, ErrorKind};
 
 #[derive(Debug)]
 pub enum Error {
-    Io(std::io::Error),
+    Io(io::Error),
     FileType,
     Version(u32, u32),
     UnsupportedFeature(String),
@@ -11,8 +12,8 @@ pub enum Error {
     Internal(String),
 }
 
-impl From<std::io::Error> for Error {
-    fn from(err: std::io::Error) -> Error {
+impl From<io::Error> for Error {
+    fn from(err: io::Error) -> Error {
         Error::Io(err)
     }
 }
@@ -37,8 +38,8 @@ impl StdError for Error {
     }
 }
 
-impl std::fmt::Display for Error {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+impl Display for Error {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         match *self {
             Error::Io(ref err) => err.fmt(f),
             Error::Version(cur, sup) => {
@@ -49,5 +50,11 @@ impl std::fmt::Display for Error {
             Error::Internal(ref err) => write!(f, "Internal error: {}", err),
             _ => f.write_str(self.description()),
         }
+    }
+}
+
+impl From<Error> for io::Error {
+    fn from(err: Error) -> io::Error {
+        io::Error::new(ErrorKind::Other, err)
     }
 }

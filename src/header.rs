@@ -311,6 +311,11 @@ impl Header {
         1 << self.c.cluster_bits
     }
 
+    // How big is the guest?
+    pub fn guest_size(&self) -> u64 {
+        self.c.size
+    }
+
     // How many virtual blocks can there be?
     pub fn max_virtual_blocks(&self) -> u64 {
         self.c.size.div_ceil(self.cluster_size())
@@ -324,5 +329,13 @@ impl Header {
     // How many entries are in an L1?
     pub fn l1_entries(&self) -> u64 {
         self.max_virtual_blocks().div_ceil(self.l2_entries())
+    }
+
+    // Find how an offset fits in the guest block hierarchy.
+    // Returns (l1_l2_idx, l2_block_idx, block_offset).
+    pub fn guest_offset_info(&self, pos: u64) -> (u64, u64, u64) {
+        let (block_idx, block_offset) = pos.div_rem(&self.cluster_size());
+        let (l1_l2_idx, l2_block_idx) = block_idx.div_rem(&self.l2_entries());
+        (l1_l2_idx, l2_block_idx, block_offset)
     }
 }
