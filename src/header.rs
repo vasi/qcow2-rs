@@ -207,7 +207,8 @@ impl Header {
 
             if len + io.position() > self.cluster_size() {
                 // Don't try to read too much dynamic data!
-                return Err(Error::FileFormat(format!("complete header too big for first cluster")));
+                return Err(Error::FileFormat("complete header too big for first cluster"
+                    .to_owned()));
             }
             {
                 let take = io.take(len);
@@ -285,6 +286,9 @@ impl Header {
             return Err(Error::Internal(format!("header must be {} bytes, but we read {}",
                                                HEADER_LENGTH_V3,
                                                io.position())));
+        }
+        if io.position() > self.cluster_size() {
+            return Err(Error::FileFormat("complete header too big for first cluster".to_owned()));
         }
 
         Ok(())
