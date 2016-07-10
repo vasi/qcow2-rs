@@ -41,6 +41,7 @@ pub enum L2Entry {
     },
 }
 
+
 impl<I> Qcow2<I>
     where I: ReadAt
 {
@@ -67,9 +68,17 @@ impl<I> Qcow2<I>
         })
     }
     fn l2_entry_read_raw(&self, l2_pos: u64, l2_block_idx: u64) -> Result<u64> {
-        // TODO: Cache things.
         let offset = l2_pos + l2_block_idx * size_of::<u64>() as u64;
-        self.io.read_u64_at(offset).map_err(From::from)
+
+        // Check the cache.
+        let mut cache = try!(self.l2_cache.lock());
+        if let Some(ret) = cache.get_mut(&offset) {
+            return Ok(*ret);
+        }
+
+        let ret = try!(self.io.read_u64_at(offset));
+        cache.insert(offset, ret);
+        Ok(ret)
     }
     fn l2_entry_parse(&self, entry: u64) -> Result<L2Entry> {
         let cow = entry & L2_COW != 0;

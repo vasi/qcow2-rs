@@ -1,6 +1,7 @@
 extern crate byteorder;
-extern crate positioned_io;
+extern crate lru_cache;
 extern crate num;
+extern crate positioned_io;
 
 mod error;
 mod extension;
@@ -13,16 +14,22 @@ pub use read::Reader;
 
 use std::fmt::{self, Debug, Formatter};
 use std::result;
+use std::sync::Mutex;
 
 use byteorder::BigEndian;
+use lru_cache::LruCache;
 use positioned_io::{ReadAt, ByteIo};
 
+
+const L2_CACHE_SIZE: usize = 32;
 
 pub struct Qcow2<I>
     where I: ReadAt
 {
     header: header::Header,
     io: ByteIo<I, BigEndian>,
+
+    l2_cache: Mutex<LruCache<u64, u64>>,
 }
 
 pub type Result<T> = std::result::Result<T, Error>;
@@ -35,6 +42,7 @@ impl<I> Qcow2<I>
         let mut q = Qcow2 {
             header: Default::default(),
             io: io,
+            l2_cache: Mutex::new(LruCache::new(L2_CACHE_SIZE)),
         };
         try!(q.header.read(&mut q.io));
         Ok(q)

@@ -14,13 +14,15 @@ fn run() -> Result<Qcow2<File>, Box<Error>> {
     let file = try!(File::open(filename));
 
     let q = try!(qcow2::Qcow2::open(file));
-    println!("{:#?}", q);
+    // println!("{:#?}", q);
 
     {
         let reader = try!(q.reader());
-        let mut buf = vec![0; 32768];
-        try!(reader.read_exact_at(8_589_905_920, &mut buf));
-        println!("Read ok!");
+        let mut buf = vec![0; 4096];
+        let count = q.guest_size() / buf.len() as u64;
+        for i in 0..count {
+            try!(reader.read_exact_at(i as u64 * buf.len() as u64, &mut buf));
+        }
     }
 
     Ok(q)

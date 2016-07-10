@@ -1,10 +1,12 @@
 use std::error::Error as StdError;
 use std::fmt::{self, Display, Formatter};
 use std::io::{self, ErrorKind};
+use std::sync::PoisonError;
 
 #[derive(Debug)]
 pub enum Error {
     Io(io::Error),
+    Poison(String),
     FileType,
     Version(u32, u32),
     UnsupportedFeature(String),
@@ -18,6 +20,12 @@ impl From<io::Error> for Error {
     }
 }
 
+impl<T> From<PoisonError<T>> for Error {
+    fn from(err: PoisonError<T>) -> Error {
+        Error::Poison(format!("{}", err))
+    }
+}
+
 impl StdError for Error {
     fn description(&self) -> &str {
         match *self {
@@ -27,6 +35,7 @@ impl StdError for Error {
             Error::UnsupportedFeature(_) => "Unsupported feature",
             Error::FileFormat(_) => "Malformed qcow2 file",
             Error::Internal(_) => "Internal error",
+            Error::Poison(ref s) => s,
         }
     }
 
