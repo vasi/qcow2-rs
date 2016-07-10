@@ -6,7 +6,7 @@ use std::ops::Deref;
 use byteorder::BigEndian;
 use positioned_io::{ByteIo, ReadAt, ReadIntAt, Size};
 
-use super::{Error, Qcow2, Qcow2Priv, Result};
+use super::{Error, Qcow2, Result};
 
 
 const L1_COW: u64 = 1 << 63;
@@ -46,7 +46,7 @@ impl<I> Qcow2<I>
     where I: ReadAt
 {
     pub fn reader<'a>(&'a self) -> Result<Box<ReadAt + 'a>> {
-        let offset = self.header().c.l1_table_offset;
+        let offset = self.header.c.l1_table_offset;
         let reader = try!(Reader::new(self, offset));
         Ok(Box::new(reader))
     }
@@ -154,6 +154,12 @@ impl<I> Qcow2<I>
         }
         Ok(ret)
     }
+
+    fn l1_read(&self, l1_offset: u64) -> Result<Vec<u8>> {
+        let mut buf = vec![0; self.header.c.l1_size as usize];
+        try!(self.io.read_exact_at(l1_offset, &mut buf));
+        Ok(buf)
+    }
 }
 
 
@@ -164,9 +170,7 @@ pub struct Reader<'a, I: 'a + ReadAt> {
 
 impl<'a, I: 'a + ReadAt> Reader<'a, I> {
     pub fn new(q: &'a Qcow2<I>, l1_offset: u64) -> Result<Self> {
-        let l1_size = q.header().c.l1_size;
-        let mut buf = vec![0; l1_size as usize];
-        try!(q.io().read_at(l1_offset, &mut buf));
+        let buf = try!(q.l1_read(l1_offset));
         let l1 = ByteIo::<_, BigEndian>::new(buf);
         Ok(Reader {
             q: q,
@@ -187,6 +191,6 @@ impl<'a, I> Size for Reader<'a, I>
     where I: 'a + ReadAt
 {
     fn size(&self) -> io::Result<Option<u64>> {
-        Ok(Some(self.q.header().guest_size()))
+        Ok(Some(self.q.guest_size()))
     }
 }

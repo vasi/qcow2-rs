@@ -1,16 +1,8 @@
-* finish v3 header
-  * features bitmaps
-  * extensions
-  * feature names
-  * check header length
+* format
+* fix deps
 
-* reasonable accessors
-  * make header private!
-  * guest size
-  * cluster size
-  * ...
-
-* better validation?
+* v3 header
+  * more extensions?
 
 * read guest blocks
   * fuse

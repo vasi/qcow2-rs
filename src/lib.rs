@@ -21,7 +21,7 @@ use positioned_io::{ReadAt, ByteIo};
 pub struct Qcow2<I>
     where I: ReadAt
 {
-    pub header: header::Header,
+    header: header::Header,
     io: ByteIo<I, BigEndian>,
 }
 
@@ -40,8 +40,11 @@ impl<I> Qcow2<I>
         Ok(q)
     }
 
-    fn cluster_size(&self) -> u64 {
+    pub fn cluster_size(&self) -> u64 {
         self.header.cluster_size()
+    }
+    pub fn guest_size(&self) -> u64 {
+        self.header.guest_size()
     }
 }
 
@@ -52,22 +55,5 @@ impl<I> Debug for Qcow2<I>
         f.debug_struct("Qcow2")
             .field("header", &self.header)
             .finish()
-    }
-}
-
-
-trait Qcow2Priv<I> {
-    fn io(&self) -> &ByteIo<I, BigEndian>;
-    fn header(&self) -> &header::Header;
-}
-
-impl<I> Qcow2Priv<I> for Qcow2<I>
-    where I: ReadAt
-{
-    fn io(&self) -> &ByteIo<I, BigEndian> {
-        &self.io
-    }
-    fn header(&self) -> &header::Header {
-        &self.header
     }
 }

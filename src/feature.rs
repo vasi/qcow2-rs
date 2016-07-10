@@ -31,9 +31,11 @@ impl Feature {
     pub fn set(&mut self, bits: u64) {
         self.bits = bits
     }
+    #[allow(dead_code)]
     pub fn enable(&mut self, bit: u64) {
         self.bits |= bit
     }
+    #[allow(dead_code)]
     pub fn disable(&mut self, bit: u64) {
         self.bits &= !bit
     }
