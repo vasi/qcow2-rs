@@ -1,7 +1,6 @@
 use std::cmp::min;
 use std::io;
 use std::mem::size_of;
-use std::ops::Deref;
 
 use byteorder::BigEndian;
 use positioned_io::{ByteIo, ReadAt, ReadIntAt, Size};
@@ -51,7 +50,7 @@ impl<I> Qcow2<I>
         Ok(Box::new(reader))
     }
 
-    fn l1_entry_read(&self, l1: &ReadIntAt, l1_l2_idx: u64) -> Result<L1Entry> {
+    fn l1_entry_read<T: ReadIntAt>(&self, l1: &T, l1_l2_idx: u64) -> Result<L1Entry> {
         let offset = l1_l2_idx * size_of::<u64>() as u64;
         let entry = try!(l1.read_u64_at(offset));
         if entry & L1_RESERVED != 0 {
@@ -100,7 +99,7 @@ impl<I> Qcow2<I>
             }
         })
     }
-    fn l2_entry_read(&self, l1: &ReadIntAt, guest_offset: u64) -> Result<L2Entry> {
+    fn l2_entry_read<T: ReadIntAt>(&self, l1: &T, guest_offset: u64) -> Result<L2Entry> {
         let (l1_l2_idx, l2_block_idx, _) = self.header.guest_offset_info(guest_offset);
         let l1_entry = try!(self.l1_entry_read(l1, l1_l2_idx));
         Ok(match l1_entry {
@@ -132,7 +131,7 @@ impl<I> Qcow2<I>
         }
         Ok(())
     }
-    fn guest_read(&self, l1: &ReadIntAt, pos: u64, mut buf: &mut [u8]) -> io::Result<usize> {
+    fn guest_read<T: ReadIntAt>(&self, l1: &T, pos: u64, mut buf: &mut [u8]) -> io::Result<usize> {
         // Check for reads past EOF.
         if pos >= self.header.guest_size() {
             return Ok(0);
@@ -165,17 +164,14 @@ impl<I> Qcow2<I>
 
 pub struct Reader<'a, I: 'a + ReadAt> {
     pub q: &'a Qcow2<I>,
-    pub l1: Box<ReadIntAt>,
+    pub l1: ByteIo<Vec<u8>, BigEndian>,
 }
 
 impl<'a, I: 'a + ReadAt> Reader<'a, I> {
     pub fn new(q: &'a Qcow2<I>, l1_offset: u64) -> Result<Self> {
         let buf = try!(q.l1_read(l1_offset));
         let l1 = ByteIo::<_, BigEndian>::new(buf);
-        Ok(Reader {
-            q: q,
-            l1: Box::new(l1),
-        })
+        Ok(Reader { q: q, l1: l1 })
     }
 }
 
@@ -183,7 +179,7 @@ impl<'a, I> ReadAt for Reader<'a, I>
     where I: 'a + ReadAt
 {
     fn read_at(&self, pos: u64, mut buf: &mut [u8]) -> io::Result<usize> {
-        self.q.guest_read(self.l1.deref(), pos, buf)
+        self.q.guest_read(&self.l1, pos, buf)
     }
 }
 
