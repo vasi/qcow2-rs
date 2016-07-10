@@ -44,10 +44,10 @@ pub enum L2Entry {
 impl<I> Qcow2<I>
     where I: ReadAt
 {
-    pub fn reader<'a>(&'a self) -> Result<Box<ReadAt + 'a>> {
+    pub fn reader<'a>(&'a self) -> Result<Reader<I>> {
         let offset = self.header.c.l1_table_offset;
         let reader = try!(Reader::new(self, offset));
-        Ok(Box::new(reader))
+        Ok(reader)
     }
 
     fn l1_entry_read<T: ReadIntAt>(&self, l1: &T, l1_l2_idx: u64) -> Result<L1Entry> {

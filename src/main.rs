@@ -1,3 +1,4 @@
+extern crate positioned_io;
 extern crate qcow2;
 
 use std::error::Error;
@@ -5,6 +6,7 @@ use std::env::args;
 use std::fs::File;
 use std::io::{stdout, Write};
 
+use positioned_io::ReadAt;
 use qcow2::Qcow2;
 
 fn run() -> Result<Qcow2<File>, Box<Error>> {
