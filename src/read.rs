@@ -155,7 +155,7 @@ impl<I> Qcow2<I>
     }
 
     fn l1_read(&self, l1_offset: u64) -> Result<Vec<u8>> {
-        let mut buf = vec![0; self.header.c.l1_size as usize];
+        let mut buf = vec![0; self.header.l1_entries() as usize * size_of::<u64>()];
         try!(self.io.read_exact_at(l1_offset, &mut buf));
         Ok(buf)
     }
