@@ -6,7 +6,7 @@ This crate can parse and read qcow2 virtual disks, as used by qemu and other emu
 only allocates space as needed. It has many other interesting features.
 
 [![Build Status](https://travis-ci.org/vasi/qcow2-rs.svg?branch=master)](https://travis-ci.org/vasi/qcow2-rs)
-[![Crates.io](https://img.shields.io/crates/v/qcow2-rs.svg?maxAge=2592000)]()
+[![Crates.io](https://img.shields.io/crates/v/qcow2.svg?maxAge=2592000)]()
 
 ### Example
 
