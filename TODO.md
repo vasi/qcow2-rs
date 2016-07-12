@@ -19,9 +19,9 @@
 * parse contents
   * partitions
   * ext4
-  * find zeros
+  * discard
 
 * writing
+  * write guest blocks
   * moving blocks around
-  * guest blocks
   * compaction
