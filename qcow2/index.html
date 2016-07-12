@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="generator" content="rustdoc">
+    <meta name="description" content="API documentation for the Rust `qcow2` crate.">
+    <meta name="keywords" content="rust, rustlang, rust-lang, qcow2">
+
+    <title>qcow2 - Rust</title>
+
+    <link rel="stylesheet" type="text/css" href="../rustdoc.css">
+    <link rel="stylesheet" type="text/css" href="../main.css">
+    
+
+    
+    
+</head>
+<body class="rustdoc">
+    <!--[if lte IE 8]>
+    <div class="warning">
+        This old browser is unsupported and will most likely display funky
+        things.
+    </div>
+    <![endif]-->
+
+    
+
+    <nav class="sidebar">
+        
+        <p class='location'></p><script>window.sidebarCurrent = {name: 'qcow2', ty: 'mod', relpath: '../'};</script>
+    </nav>
+
+    <nav class="sub">
+        <form class="search-form js-only">
+            <div class="search-container">
+                <input class="search-input" name="search"
+                       autocomplete="off"
+                       placeholder="Click or press ‘S’ to search, ‘?’ for more options…"
+                       type="search">
+            </div>
+        </form>
+    </nav>
+
+    <section id='main' class="content mod">
+<h1 class='fqn'><span class='in-band'>Crate <a class='mod' href=''>qcow2</a></span><span class='out-of-band'><span id='render-detail'>
+                   <a id="toggle-all-docs" href="javascript:void(0)" title="collapse all docs">
+                       [<span class='inner'>&#x2212;</span>]
+                   </a>
+               </span><a id='src-0' class='srclink' href='../src/qcow2/src/lib.rs.html#1-139' title='goto source code'>[src]</a></span></h1>
+<div class='docblock'><p>This crate can parse and read qcow2 virtual disks, as used by qemu and other emulators.</p>
+
+<p><a href="https://en.wikipedia.org/wiki/Qcow">Qcow2</a> is a flexible format for disk images, that only
+allocates space as needed. It has many other interesting features.</p>
+
+<p>The following featuers are supported by this crate:</p>
+
+<ul>
+<li>Reading blocks of virtual disk data.</li>
+<li>Reading data that is not aligned to block boundaries.</li>
+<li>Parsing and validation of the header.</li>
+<li>Reporting the names of any unsupported features, using the &quot;feature name table&quot; extension.</li>
+<li>Basic caching of guest data locations, so nearby reads will be fast.</li>
+</ul>
+
+<p>These features are not yet supported, but should be easy to add:</p>
+
+<ul>
+<li>Listing and reading snapshots.</li>
+<li>Reading version 2, currently only version 3 is supported.</li>
+<li>Reading compressed data.</li>
+<li>Backing file support, so you can chain qcow2 files together.</li>
+<li>Reporting information about images.</li>
+</ul>
+
+<p>These features are harder, or less interesting to me. Patches welcome!</p>
+
+<ul>
+<li>Reading encrypted qcow2 files.</li>
+<li>Writing virtual disk data.</li>
+<li>Repairing the disk if refcounts are out of date.</li>
+<li>Compacting the virtual disk so it takes less space.</li>
+<li>Maintaining a &quot;dirty bitmap&quot; to make backups faster.</li>
+<li>Creating new qcow2 images.</li>
+<li>Creating new snapshots.</li>
+<li>Checking qcow2 images for inconsistencies.</li>
+<li>Merging images into their backing file.</li>
+<li>Resizing images.</li>
+</ul>
+
+<p>The repository for this crate is at <a href="https://github.com/vasi/qcow2-rs">https://github.com/vasi/qcow2-rs</a></p>
+</div><h2 id='structs' class='section-header'><a href="#structs">Structs</a></h2>
+<table>
+                       <tr class=' module-item'>
+                           <td><a class='struct' href='struct.Qcow2.html'
+                                  title='qcow2::Qcow2'>Qcow2</a></td>
+                           <td class='docblock short'>
+                                <p>A qcow2 image.</p>
+                           </td>
+                       </tr>
+                       <tr class=' module-item'>
+                           <td><a class='struct' href='struct.Reader.html'
+                                  title='qcow2::Reader'>Reader</a></td>
+                           <td class='docblock short'>
+                                <p>A reader of data from the virtual disk image.</p>
+                           </td>
+                       </tr></table><h2 id='enums' class='section-header'><a href="#enums">Enums</a></h2>
+<table>
+                       <tr class=' module-item'>
+                           <td><a class='enum' href='enum.Error.html'
+                                  title='qcow2::Error'>Error</a></td>
+                           <td class='docblock short'>
+                                <p>The error type for Qcow2 operations.</p>
+                           </td>
+                       </tr></table><h2 id='types' class='section-header'><a href="#types">Type Definitions</a></h2>
+<table>
+                       <tr class=' module-item'>
+                           <td><a class='type' href='type.Result.html'
+                                  title='qcow2::Result'>Result</a></td>
+                           <td class='docblock short'>
+                                <p>The result type for operations on qcow2 images.</p>
+                           </td>
+                       </tr></table></section>
+    <section id='search' class="content hidden"></section>
+
+    <section class="footer"></section>
+
+    <aside id="help" class="hidden">
+        <div>
+            <h1 class="hidden">Help</h1>
+
+            <div class="shortcuts">
+                <h2>Keyboard Shortcuts</h2>
+
+                <dl>
+                    <dt>?</dt>
+                    <dd>Show this help dialog</dd>
+                    <dt>S</dt>
+                    <dd>Focus the search field</dd>
+                    <dt>&larrb;</dt>
+                    <dd>Move up in search results</dd>
+                    <dt>&rarrb;</dt>
+                    <dd>Move down in search results</dd>
+                    <dt>&#9166;</dt>
+                    <dd>Go to active search result</dd>
+                </dl>
+            </div>
+
+            <div class="infos">
+                <h2>Search Tricks</h2>
+
+                <p>
+                    Prefix searches with a type followed by a colon (e.g.
+                    <code>fn:</code>) to restrict the search to a given type.
+                </p>
+
+                <p>
+                    Accepted types are: <code>fn</code>, <code>mod</code>,
+                    <code>struct</code>, <code>enum</code>,
+                    <code>trait</code>, <code>type</code>, <code>macro</code>,
+                    and <code>const</code>.
+                </p>
+
+                <p>
+                    Search functions by type signature (e.g.
+                    <code>vec -> usize</code> or <code>* -> vec</code>)
+                </p>
+            </div>
+        </div>
+    </aside>
+
+    
+
+    <script>
+        window.rootPath = "../";
+        window.currentCrate = "qcow2";
+        window.playgroundUrl = "";
+    </script>
+    <script src="../jquery.js"></script>
+    <script src="../main.js"></script>
+    
+    <script defer src="../search-index.js"></script>
+</body>
+</html>

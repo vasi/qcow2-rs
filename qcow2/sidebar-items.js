@@ -1,0 +1,1 @@
+initSidebarItems({"enum":[["Error","The error type for Qcow2 operations."]],"struct":[["Qcow2","A qcow2 image."],["Reader","A reader of data from the virtual disk image."]],"type":[["Result","The result type for operations on qcow2 images."]]});

@@ -1,0 +1,1 @@
+initSidebarItems({"struct":[["Reader","A reader of data from the virtual disk image."]]});

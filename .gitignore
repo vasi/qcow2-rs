@@ -1,0 +1,13 @@
+target
+Cargo.lock
+*.bk
+*.qcow2
+
+.travis.yml
+Cargo.toml
+LICENSE-MIT
+TODO.md
+README.md
+src
+tests
+
