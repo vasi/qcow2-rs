@@ -66,9 +66,7 @@ impl Display for Error {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         match *self {
             Error::Io(ref err) => err.fmt(f),
-            Error::Version(found) => {
-                write!(f, "Unsupported version {}", found)
-            }
+            Error::Version(found) => write!(f, "Unsupported version {}", found),
             Error::UnsupportedFeature(ref feat) => write!(f, "Unsupported feature: {}", feat),
             Error::FileFormat(ref err) => write!(f, "Malformed qcow2 file: {}", err),
             Error::Internal(ref err) => write!(f, "Internal error: {}", err),

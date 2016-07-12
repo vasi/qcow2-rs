@@ -2,7 +2,6 @@
 * README
 * docs
   * cargo metadata
-  * auto-upload?
 * tests
   * coverage?
   * travis
