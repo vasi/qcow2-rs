@@ -1,10 +1,5 @@
-* cargo fmt
-* README
-* docs
-  * cargo metadata
 * tests
   * coverage?
-  * travis
 
 * v3 header
   * more extensions?
@@ -29,3 +24,5 @@
   * write guest blocks
   * moving blocks around
   * compaction
+
+* cargo fmt
