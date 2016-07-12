@@ -1,6 +1,11 @@
 * cargo fmt
+* README
 * docs
+  * cargo metadata
+  * auto-upload?
 * tests
+  * coverage?
+  * travis
 
 * v3 header
   * more extensions?

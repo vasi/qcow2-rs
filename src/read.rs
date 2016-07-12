@@ -45,6 +45,9 @@ pub enum L2Entry {
 impl<I> Qcow2<I>
     where I: ReadAt
 {
+    /// Get a Reader for the main virtual disk.
+    ///
+    /// This allows data to be read from inside the virtual disk image.
     pub fn reader<'a>(&'a self) -> Result<Reader<I>> {
         let offset = self.header.c.l1_table_offset;
         let reader = try!(Reader::new(self, offset));
@@ -170,14 +173,14 @@ impl<I> Qcow2<I>
     }
 }
 
-
+/// A reader of data from the virtual disk image.
 pub struct Reader<'a, I: 'a + ReadAt> {
-    pub q: &'a Qcow2<I>,
-    pub l1: ByteIo<Vec<u8>, BigEndian>,
+    q: &'a Qcow2<I>,
+    l1: ByteIo<Vec<u8>, BigEndian>,
 }
 
 impl<'a, I: 'a + ReadAt> Reader<'a, I> {
-    pub fn new(q: &'a Qcow2<I>, l1_offset: u64) -> Result<Self> {
+    fn new(q: &'a Qcow2<I>, l1_offset: u64) -> Result<Self> {
         let buf = try!(q.l1_read(l1_offset));
         let l1 = ByteIo::<_, BigEndian>::new(buf);
         Ok(Reader { q: q, l1: l1 })

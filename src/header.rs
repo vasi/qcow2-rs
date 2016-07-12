@@ -137,7 +137,7 @@ impl Header {
             return Err(Error::FileType);
         }
         if self.c.version != SUPPORTED_VERSION {
-            return Err(Error::Version(self.c.version, SUPPORTED_VERSION));
+            return Err(Error::Version(self.c.version));
         }
         if self.c.backing_file_offset != 0 {
             return Err(Error::UnsupportedFeature("backing file".to_owned()));
