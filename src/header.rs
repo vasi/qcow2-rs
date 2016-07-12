@@ -13,11 +13,10 @@ use std::result;
 use std::os::unix::ffi::OsStrExt;
 
 use byteorder::BigEndian;
-use num::Integer as NumInteger;
 use positioned_io::{ByteIo, ReadAt, ReadInt, Cursor};
 
 use super::{Result, Error};
-use super::int::Integer;
+use super::int::{is_multiple_of, padding_to_multiple, div_ceil, div_rem};
 use super::extension::{Extension, FeatureNameTable, UnknownExtension, DebugExtensions};
 use super::feature::{Feature, FeatureKind};
 
@@ -158,13 +157,13 @@ impl Header {
         if self.c.l1_size as u64 != self.l1_entries() {
             return Err(Error::FileFormat("bad L1 entry count".to_owned()));
         }
-        if !self.c.l1_table_offset.is_multiple_of(&self.cluster_size()) {
+        if !is_multiple_of(self.c.l1_table_offset, self.cluster_size()) {
             return Err(Error::FileFormat("bad L1 offset".to_owned()));
         }
-        if !self.c.refcount_table_offset.is_multiple_of(&self.cluster_size()) {
+        if !is_multiple_of(self.c.refcount_table_offset, self.cluster_size()) {
             return Err(Error::FileFormat("bad refcount offset".to_owned()));
         }
-        if !self.c.snapshots_offset.is_multiple_of(&self.cluster_size()) {
+        if !is_multiple_of(self.c.snapshots_offset, self.cluster_size()) {
             return Err(Error::FileFormat("bad snapshots offset".to_owned()));
         }
         Ok(())
@@ -228,7 +227,7 @@ impl Header {
             }
 
             // Read padding.
-            let mut pad = vec![0; len.padding_to_multiple(8) as usize];
+            let mut pad = vec![0; padding_to_multiple(len, 8)];
             try!(io.read_exact(&mut pad));
         }
         Ok(())
@@ -319,7 +318,7 @@ impl Header {
 
     // How many virtual blocks can there be?
     pub fn max_virtual_blocks(&self) -> u64 {
-        self.c.size.div_ceil(self.cluster_size())
+        div_ceil(self.c.size, self.cluster_size())
     }
 
     // How many entries are in an L2?
@@ -329,14 +328,14 @@ impl Header {
 
     // How many entries are in an L1?
     pub fn l1_entries(&self) -> u64 {
-        self.max_virtual_blocks().div_ceil(self.l2_entries())
+        div_ceil(self.max_virtual_blocks(), self.l2_entries())
     }
 
     // Find how an offset fits in the guest block hierarchy.
     // Returns (l1_l2_idx, l2_block_idx, block_offset).
     pub fn guest_offset_info(&self, pos: u64) -> (u64, u64, u64) {
-        let (block_idx, block_offset) = pos.div_rem(&self.cluster_size());
-        let (l1_l2_idx, l2_block_idx) = block_idx.div_rem(&self.l2_entries());
+        let (block_idx, block_offset) = div_rem(pos, self.cluster_size());
+        let (l1_l2_idx, l2_block_idx) = div_rem(block_idx, self.l2_entries());
         (l1_l2_idx, l2_block_idx, block_offset)
     }
 }

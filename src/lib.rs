@@ -38,7 +38,6 @@
 
 extern crate byteorder;
 extern crate lru_cache;
-extern crate num;
 extern crate positioned_io;
 
 mod error;
