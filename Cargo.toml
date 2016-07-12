@@ -6,5 +6,5 @@ authors = ["Dave Vasilevsky <dave@vasilevsky.ca>"]
 [dependencies]
 byteorder = "0.5"
 lru-cache = "0.0.7"
-positioned-io = { path = "../positioned-io" }
+positioned-io = "0.2.0"
 num = "0.1"

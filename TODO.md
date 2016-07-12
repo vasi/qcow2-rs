@@ -1,12 +1,11 @@
-* format
-* fix deps
+* cargo fmt
+* docs
+* tests
 
 * v3 header
   * more extensions?
 
 * read guest blocks
-  * fuse
-  * cache
   * snapshots
 
 * features
