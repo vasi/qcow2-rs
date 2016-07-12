@@ -33,6 +33,8 @@
 //! * Checking qcow2 images for inconsistencies.
 //! * Merging images into their backing file.
 //! * Resizing images.
+//!
+//! The repository for this crate is at https://github.com/vasi/qcow2-rs
 
 extern crate byteorder;
 extern crate lru_cache;
