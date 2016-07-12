@@ -3,6 +3,7 @@
 
 * v3 header
   * more extensions?
+  * more publicly available metadata
 
 * read guest blocks
   * snapshots
