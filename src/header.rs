@@ -74,7 +74,7 @@ impl HeaderV3 {
     pub fn extension(&mut self, code: u32) -> &mut Extension {
         match code {
             extension::EXT_CODE_FEATURE_NAME_TABLE => &mut self.feature_name_table,
-            _ =>  {
+            _ => {
                 let u = UnknownExtension::new(code);
                 self.unknown_extensions.push(u);
                 self.unknown_extensions.last_mut().unwrap()
