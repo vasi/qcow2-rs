@@ -1,5 +1,3 @@
-use std::sync::MutexGuard;
-
 use super::{Result, Error};
 use super::extension::FeatureNameTable;
 
@@ -54,7 +52,7 @@ impl Feature {
         }
     }
 
-    pub fn ensure_known(&self, table: &MutexGuard<Box<FeatureNameTable>>) -> Result<()> {
+    pub fn ensure_known(&self, table: &FeatureNameTable) -> Result<()> {
         let unknown = self.unknown();
         if unknown.bits() == 0 {
             Ok(())
@@ -64,7 +62,7 @@ impl Feature {
     }
 
     // Show a nice representation of a feature set.
-    pub fn to_string(&self, table: &MutexGuard<Box<FeatureNameTable>>) -> String {
+    pub fn to_string(&self, table: &FeatureNameTable) -> String {
         let known = self.names.len();
         let mut pos = 0;
         let mut bits = self.bits;

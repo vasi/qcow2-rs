@@ -2,9 +2,7 @@ use std::ascii::AsciiExt;
 use std::borrow::Cow;
 use std::fmt::{self, Debug, Formatter};
 use std::io::ErrorKind;
-use std::ops::Deref;
 use std::result;
-use std::sync::{Arc, Mutex};
 
 use byteorder::ReadBytesExt;
 use positioned_io::ReadInt;
@@ -13,27 +11,14 @@ use super::{Result, Error};
 use super::feature::{FeatureKind, FEATURE_KIND_COUNT};
 
 
+pub const EXT_CODE_FEATURE_NAME_TABLE: u32 = 0x6803f857;
+pub const EXT_CODE_NONE: u32 = 0;
+
 pub trait Extension: Debug {
     fn extension_code(&self) -> u32;
     fn read(&mut self, io: &mut ReadInt) -> Result<()>;
 }
 
-pub struct DebugExtensions<'a>(pub &'a Vec<Arc<Mutex<Box<Extension>>>>);
-impl<'a> Debug for DebugExtensions<'a> {
-    fn fmt(&self, fmt: &mut Formatter) -> result::Result<(), fmt::Error> {
-        let mut helper = fmt.debug_list();
-        for r in self.0.iter() {
-            let e = match r.lock() {
-                Ok(e) => e,
-                Err(_) => return Err(fmt::Error {}),
-            };
-            if e.extension_code() != 0 {
-                helper.entry(&e.deref());
-            }
-        }
-        helper.finish()
-    }
-}
 
 pub struct UnknownExtension {
     code: u32,
@@ -49,7 +34,7 @@ impl UnknownExtension {
 }
 impl Extension for UnknownExtension {
     fn extension_code(&self) -> u32 {
-        0
+        self.code
     }
     fn read(&mut self, io: &mut ReadInt) -> Result<()> {
         try!(io.read_to_end(&mut self.data));
@@ -85,7 +70,7 @@ impl FeatureNameTable {
 }
 impl Extension for FeatureNameTable {
     fn extension_code(&self) -> u32 {
-        0x6803f857
+        EXT_CODE_FEATURE_NAME_TABLE
     }
     fn read(&mut self, io: &mut ReadInt) -> Result<()> {
         loop {

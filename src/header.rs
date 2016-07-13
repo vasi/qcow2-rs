@@ -3,10 +3,9 @@ use std::ffi::OsStr;
 use std::fmt::{self, Debug, Formatter};
 use std::io::Read;
 use std::mem::size_of;
-use std::ops::{Deref, DerefMut};
+use std::ops::DerefMut;
 use std::path::PathBuf;
 use std::result;
-use std::sync::{Arc, Mutex, MutexGuard};
 
 #[cfg(unix)]
 use std::os::unix::ffi::OsStrExt;
@@ -16,7 +15,7 @@ use positioned_io::{ByteIo, ReadAt, ReadInt, Cursor};
 
 use super::{Result, Error};
 use super::int::{is_multiple_of, padding_to_multiple, div_ceil, div_rem};
-use super::extension::{Extension, FeatureNameTable, UnknownExtension, DebugExtensions};
+use super::extension::{self, Extension, FeatureNameTable, UnknownExtension};
 use super::feature::{Feature, FeatureKind};
 
 const MAGIC: u32 = 0x514649fb;
@@ -65,55 +64,43 @@ pub struct HeaderV3 {
     pub refcount_order: u32,
     pub header_length: u32,
 
-    // Need box due to: https://github.com/rust-lang/rust/issues/16758
-    pub feature_name_table: Arc<Mutex<Box<FeatureNameTable>>>,
-    pub extensions: Vec<Arc<Mutex<Box<Extension>>>>,
+    pub feature_name_table: FeatureNameTable,
+    pub unknown_extensions: Vec<UnknownExtension>,
 
     pub backing_file_name: PathBuf,
 }
 impl HeaderV3 {
-    pub fn feature_name_table(&self) -> Result<MutexGuard<Box<FeatureNameTable>>> {
-        self.feature_name_table.lock().map_err(From::from)
-    }
-
     // Get an extension by extension code. If we can't find one, use UnknownExtension.
-    pub fn extension(&mut self, code: u32) -> Result<Arc<Mutex<Box<Extension>>>> {
-        for r in &self.extensions {
-            let e = try!(r.lock());
-            if e.extension_code() == code {
-                return Ok(r.clone());
+    pub fn extension(&mut self, code: u32) -> &mut Extension {
+        match code {
+            extension::EXT_CODE_FEATURE_NAME_TABLE => &mut self.feature_name_table,
+            _ =>  {
+                let u = UnknownExtension::new(code);
+                self.unknown_extensions.push(u);
+                self.unknown_extensions.last_mut().unwrap()
             }
         }
-
-        let u: Arc<Mutex<Box<Extension>>> = Arc::new(Mutex::new(Box::new(UnknownExtension::new(code))));
-        self.extensions.push(u.clone());
-        Ok(u)
     }
 }
 impl Debug for HeaderV3 {
     fn fmt(&self, fmt: &mut Formatter) -> result::Result<(), fmt::Error> {
-        let feature_name_table = match self.feature_name_table() {
-            Ok(fnt) => fnt,
-            Err(_) => return Err(fmt::Error { }),
-        };
         fmt.debug_struct("HeaderV3")
             .field("incompatible",
-                   &self.incompatible.to_string(&feature_name_table))
+                   &self.incompatible.to_string(&self.feature_name_table))
             .field("compatible",
-                   &self.compatible.to_string(&feature_name_table))
+                   &self.compatible.to_string(&self.feature_name_table))
             .field("autoclear",
-                   &self.autoclear.to_string(&feature_name_table))
+                   &self.autoclear.to_string(&self.feature_name_table))
             .field("refcount_order", &self.refcount_order)
             .field("header_length", &self.header_length)
-            .field("feature_name_table", feature_name_table.deref())
+            .field("feature_name_table", &self.feature_name_table)
             .field("backing_file_name", &self.backing_file_name)
-            .field("unknown extensions", &DebugExtensions(&self.extensions))
+            .field("unknown extensions", &self.unknown_extensions)
             .finish()
     }
 }
 impl Default for HeaderV3 {
     fn default() -> Self {
-        let feature_name_table = Arc::new(Mutex::new(Box::new(FeatureNameTable::default())));
         HeaderV3 {
             incompatible: Feature::new(FeatureKind::Incompatible, INCOMPATIBLE_NAMES),
             compatible: Feature::new(FeatureKind::Compatible, COMPATIBLE_NAMES),
@@ -121,8 +108,8 @@ impl Default for HeaderV3 {
             refcount_order: 0,
             header_length: 0,
             backing_file_name: PathBuf::new(),
-            feature_name_table: feature_name_table.clone(),
-            extensions: vec![feature_name_table.clone()],
+            feature_name_table: FeatureNameTable::default(),
+            unknown_extensions: Vec::new(),
         }
     }
 }
@@ -205,7 +192,7 @@ impl Header {
             seen.insert(ext_code);
 
             let len = try!(io.read_u32()) as u64;
-            if ext_code == 0 {
+            if ext_code == extension::EXT_CODE_NONE {
                 break;
             }
 
@@ -217,8 +204,7 @@ impl Header {
             {
                 let take = io.take(len);
                 let mut sub = ByteIo::<_, BigEndian>::new(take);
-                let ext = try!(self.v3.extension(ext_code));
-                let mut ext = try!(ext.lock());
+                let mut ext = self.v3.extension(ext_code);
                 try!(ext.read(&mut sub));
 
                 // Verify all is read.
@@ -278,8 +264,7 @@ impl Header {
         if self.v3.incompatible.enabled(INCOMPATIBLE_CORRUPT) {
             return Err(Error::UnsupportedFeature("corrupt bit".to_owned()));
         }
-        let feature_name_table = try!(self.v3.feature_name_table());
-        try!(self.v3.incompatible.ensure_known(&feature_name_table));
+        try!(self.v3.incompatible.ensure_known(&self.v3.feature_name_table));
         if self.v3.refcount_order > 6 {
             return Err(Error::FileFormat(format!("bad refcount_order {}", self.v3.refcount_order)));
         }
