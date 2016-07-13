@@ -1,3 +1,10 @@
+# [0.1.2] - 2016-07-13
+
+* Simplify header extension implementation.
+* Qcow2 is now Send/Sync.
+* Add qcow2-dump binary.
+
+
 # [0.1.1] - 2016-07-12
 
 * Remove dependency on num.
