@@ -1,10 +1,10 @@
 use std::ascii::AsciiExt;
 use std::borrow::Cow;
-use std::cell::RefCell;
 use std::fmt::{self, Debug, Formatter};
 use std::io::ErrorKind;
-use std::rc::Rc;
+use std::ops::Deref;
 use std::result;
+use std::sync::{Arc, Mutex};
 
 use byteorder::ReadBytesExt;
 use positioned_io::ReadInt;
@@ -18,12 +18,20 @@ pub trait Extension: Debug {
     fn read(&mut self, io: &mut ReadInt) -> Result<()>;
 }
 
-pub struct DebugExtensions<'a>(pub &'a Vec<Rc<RefCell<Extension>>>);
+pub struct DebugExtensions<'a>(pub &'a Vec<Arc<Mutex<Box<Extension>>>>);
 impl<'a> Debug for DebugExtensions<'a> {
     fn fmt(&self, fmt: &mut Formatter) -> result::Result<(), fmt::Error> {
-        fmt.debug_list()
-            .entries(self.0.iter().map(|e| e.borrow()).filter(|e| e.extension_code() == 0))
-            .finish()
+        let mut helper = fmt.debug_list();
+        for r in self.0.iter() {
+            let e = match r.lock() {
+                Ok(e) => e,
+                Err(_) => return Err(fmt::Error {}),
+            };
+            if e.extension_code() != 0 {
+                helper.entry(&e.deref());
+            }
+        }
+        helper.finish()
     }
 }
 

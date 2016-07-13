@@ -1,5 +1,4 @@
-use std::fmt::{self, Debug, Formatter};
-use std::result;
+use std::sync::MutexGuard;
 
 use super::{Result, Error};
 use super::extension::FeatureNameTable;
@@ -55,28 +54,22 @@ impl Feature {
         }
     }
 
-    pub fn ensure_known(&self, table: &FeatureNameTable) -> Result<()> {
+    pub fn ensure_known(&self, table: &MutexGuard<Box<FeatureNameTable>>) -> Result<()> {
         let unknown = self.unknown();
         if unknown.bits() == 0 {
             Ok(())
         } else {
-            Err(Error::UnsupportedFeature(format!("{:?}", unknown.debug(table))))
+            Err(Error::UnsupportedFeature(unknown.to_string(table)))
         }
     }
 
-    pub fn debug<'a>(&'a self, table: &'a FeatureNameTable) -> FeatureDebug {
-        FeatureDebug(self, table)
-    }
-}
-
-
-pub struct FeatureDebug<'a, 'b>(&'a Feature, &'b FeatureNameTable);
-impl<'a, 'b> Debug for FeatureDebug<'a, 'b> {
-    fn fmt(&self, fmt: &mut Formatter) -> result::Result<(), fmt::Error> {
-        let known = self.0.names.len();
-        let mut first = true;
+    // Show a nice representation of a feature set.
+    pub fn to_string(&self, table: &MutexGuard<Box<FeatureNameTable>>) -> String {
+        let known = self.names.len();
         let mut pos = 0;
-        let mut bits = self.0.bits;
+        let mut bits = self.bits;
+        let mut descs = Vec::new();
+
         while bits > 0 {
             let trailing = bits.trailing_zeros();
             if trailing > 0 {
@@ -85,20 +78,15 @@ impl<'a, 'b> Debug for FeatureDebug<'a, 'b> {
                 continue;
             }
 
-            if !first {
-                try!(fmt.write_str(" | "));
-            }
             if (pos as usize) < known {
-                try!(fmt.write_str(self.0.names[pos as usize]));
+                descs.push(self.names[pos as usize].to_owned());
             } else {
-                try!(write!(fmt, "{}", self.1.name(self.0.kind, pos as u8)));
+                descs.push(table.name(self.kind, pos as u8).into_owned());
             }
-
-            first = false;
             bits >>= 1;
             pos += 1;
         }
 
-        Ok(())
+        descs.join(" | ")
     }
 }

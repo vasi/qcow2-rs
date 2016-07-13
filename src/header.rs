@@ -1,13 +1,12 @@
-use std::cell::{RefCell, Ref};
 use std::collections::HashSet;
 use std::ffi::OsStr;
 use std::fmt::{self, Debug, Formatter};
 use std::io::Read;
 use std::mem::size_of;
-use std::ops::DerefMut;
+use std::ops::{Deref, DerefMut};
 use std::path::PathBuf;
-use std::rc::Rc;
 use std::result;
+use std::sync::{Arc, Mutex, MutexGuard};
 
 #[cfg(unix)]
 use std::os::unix::ffi::OsStrExt;
@@ -66,42 +65,47 @@ pub struct HeaderV3 {
     pub refcount_order: u32,
     pub header_length: u32,
 
-    pub feature_name_table: Rc<RefCell<FeatureNameTable>>,
-    pub extensions: Vec<Rc<RefCell<Extension>>>,
+    // Need box due to: https://github.com/rust-lang/rust/issues/16758
+    pub feature_name_table: Arc<Mutex<Box<FeatureNameTable>>>,
+    pub extensions: Vec<Arc<Mutex<Box<Extension>>>>,
 
     pub backing_file_name: PathBuf,
 }
 impl HeaderV3 {
-    pub fn feature_name_table(&self) -> Ref<FeatureNameTable> {
-        self.feature_name_table.borrow()
+    pub fn feature_name_table(&self) -> Result<MutexGuard<Box<FeatureNameTable>>> {
+        self.feature_name_table.lock().map_err(From::from)
     }
 
     // Get an extension by extension code. If we can't find one, use UnknownExtension.
-    pub fn extension(&mut self, code: u32) -> Rc<RefCell<Extension>> {
+    pub fn extension(&mut self, code: u32) -> Result<Arc<Mutex<Box<Extension>>>> {
         for r in &self.extensions {
-            let e = r.borrow();
+            let e = try!(r.lock());
             if e.extension_code() == code {
-                return r.clone();
+                return Ok(r.clone());
             }
         }
 
-        let u = Rc::new(RefCell::new(UnknownExtension::new(code)));
+        let u: Arc<Mutex<Box<Extension>>> = Arc::new(Mutex::new(Box::new(UnknownExtension::new(code))));
         self.extensions.push(u.clone());
-        u
+        Ok(u)
     }
 }
 impl Debug for HeaderV3 {
     fn fmt(&self, fmt: &mut Formatter) -> result::Result<(), fmt::Error> {
+        let feature_name_table = match self.feature_name_table() {
+            Ok(fnt) => fnt,
+            Err(_) => return Err(fmt::Error { }),
+        };
         fmt.debug_struct("HeaderV3")
             .field("incompatible",
-                   &self.incompatible.debug(&self.feature_name_table()))
+                   &self.incompatible.to_string(&feature_name_table))
             .field("compatible",
-                   &self.compatible.debug(&self.feature_name_table()))
+                   &self.compatible.to_string(&feature_name_table))
             .field("autoclear",
-                   &self.autoclear.debug(&self.feature_name_table()))
+                   &self.autoclear.to_string(&feature_name_table))
             .field("refcount_order", &self.refcount_order)
             .field("header_length", &self.header_length)
-            .field("feature_name_table", &self.feature_name_table.borrow())
+            .field("feature_name_table", feature_name_table.deref())
             .field("backing_file_name", &self.backing_file_name)
             .field("unknown extensions", &DebugExtensions(&self.extensions))
             .finish()
@@ -109,7 +113,7 @@ impl Debug for HeaderV3 {
 }
 impl Default for HeaderV3 {
     fn default() -> Self {
-        let feature_name_table = Rc::new(RefCell::new(FeatureNameTable::default()));
+        let feature_name_table = Arc::new(Mutex::new(Box::new(FeatureNameTable::default())));
         HeaderV3 {
             incompatible: Feature::new(FeatureKind::Incompatible, INCOMPATIBLE_NAMES),
             compatible: Feature::new(FeatureKind::Compatible, COMPATIBLE_NAMES),
@@ -213,8 +217,9 @@ impl Header {
             {
                 let take = io.take(len);
                 let mut sub = ByteIo::<_, BigEndian>::new(take);
-                let ext = self.v3.extension(ext_code);
-                try!(ext.borrow_mut().read(&mut sub));
+                let ext = try!(self.v3.extension(ext_code));
+                let mut ext = try!(ext.lock());
+                try!(ext.read(&mut sub));
 
                 // Verify all is read.
                 let remain = sub.bytes().count();
@@ -273,7 +278,8 @@ impl Header {
         if self.v3.incompatible.enabled(INCOMPATIBLE_CORRUPT) {
             return Err(Error::UnsupportedFeature("corrupt bit".to_owned()));
         }
-        try!(self.v3.incompatible.ensure_known(&self.v3.feature_name_table()));
+        let feature_name_table = try!(self.v3.feature_name_table());
+        try!(self.v3.incompatible.ensure_known(&feature_name_table));
         if self.v3.refcount_order > 6 {
             return Err(Error::FileFormat(format!("bad refcount_order {}", self.v3.refcount_order)));
         }
