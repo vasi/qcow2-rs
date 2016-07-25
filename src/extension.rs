@@ -4,7 +4,6 @@ use std::fmt::{self, Debug, Formatter};
 use std::io::ErrorKind;
 use std::result;
 
-use byteorder::ReadBytesExt;
 use positioned_io::ReadInt;
 
 use super::{Result, Error};
