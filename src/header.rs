@@ -246,6 +246,11 @@ impl Header {
         self.v3.autoclear.set(try!(io.read_u64()));
         self.v3.refcount_order = try!(io.read_u32());
         self.v3.header_length = try!(io.read_u32());
+        if self.v3.header_length as u64 > io.position() {
+            // There are addition fields.
+            // XXX compression header field ought to be extracted
+            io.set_position(self.v3.header_length as u64);
+        }
         let actual_length = io.position();
         try!(self.read_extensions(io));
         if self.c.backing_file_offset != 0 {
@@ -268,15 +273,10 @@ impl Header {
         if self.v3.refcount_order > 6 {
             return Err(Error::FileFormat(format!("bad refcount_order {}", self.v3.refcount_order)));
         }
-        if self.v3.header_length as u64 != io.position() {
+        if self.v3.header_length as u64 != actual_length {
             return Err(Error::FileFormat(format!("header is {} bytes, file claims {}",
-                                                 io.position(),
+                                                 actual_length,
                                                  self.v3.header_length)));
-        }
-        if actual_length != HEADER_LENGTH_V3 as u64 {
-            return Err(Error::Internal(format!("header must be {} bytes, but we read {}",
-                                               HEADER_LENGTH_V3,
-                                               io.position())));
         }
         if io.position() > self.cluster_size() {
             return Err(Error::FileFormat("complete header too big for first cluster".to_owned()));
