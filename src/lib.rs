@@ -46,8 +46,8 @@ mod feature;
 mod header;
 mod int;
 mod read;
-pub use error::Error;
-pub use read::Reader;
+pub use crate::error::Error;
+pub use crate::read::Reader;
 
 use std::fmt::{self, Debug, Formatter};
 use std::result;

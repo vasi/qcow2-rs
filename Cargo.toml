@@ -1,6 +1,7 @@
 [package]
 name = "qcow2"
 version = "0.1.2"
+edition = "2021"
 authors = ["Dave Vasilevsky <dave@vasilevsky.ca>"]
 description = "Reading qcow2 virtual disk images"
 keywords = ["qcow2", "qemu", "disk", "image"]
