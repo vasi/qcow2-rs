@@ -15,7 +15,7 @@ pub const EXT_CODE_NONE: u32 = 0;
 
 pub trait Extension: Debug {
     fn extension_code(&self) -> u32;
-    fn read(&mut self, io: &mut ReadInt) -> Result<()>;
+    fn read(&mut self, io: &mut dyn ReadInt) -> Result<()>;
 }
 
 
@@ -26,7 +26,7 @@ pub struct UnknownExtension {
 impl UnknownExtension {
     pub fn new(code: u32) -> Self {
         UnknownExtension {
-            code: code,
+            code,
             data: vec![],
         }
     }
@@ -35,7 +35,7 @@ impl Extension for UnknownExtension {
     fn extension_code(&self) -> u32 {
         self.code
     }
-    fn read(&mut self, io: &mut ReadInt) -> Result<()> {
+    fn read(&mut self, io: &mut dyn ReadInt) -> Result<()> {
         try!(io.read_to_end(&mut self.data));
         Ok(())
     }
@@ -71,7 +71,7 @@ impl Extension for FeatureNameTable {
     fn extension_code(&self) -> u32 {
         EXT_CODE_FEATURE_NAME_TABLE
     }
-    fn read(&mut self, io: &mut ReadInt) -> Result<()> {
+    fn read(&mut self, io: &mut dyn ReadInt) -> Result<()> {
         loop {
             match io.read_u8() {
                 Err(ref e) if e.kind() == ErrorKind::UnexpectedEof => break,
@@ -91,9 +91,8 @@ impl Extension for FeatureNameTable {
                     let mut buf = [0; 46];
                     try!(io.read_exact(&mut buf));
                     // Remove trailing zero bytes from name.
-                    let chars = buf.into_iter()
-                        .take_while(|&&c| c != 0)
-                        .map(|&c| c)
+                    let chars = buf.iter()
+                        .take_while(|&&c| c != 0).copied()
                         .collect::<Vec<_>>();
                     // Error on non-ASCII characters, are those supported?
                     match chars.iter().find(|c| !c.is_ascii()) {
@@ -106,9 +105,9 @@ impl Extension for FeatureNameTable {
                     // This can't fail!
                     let name = String::from_utf8(chars).unwrap();
                     self.0.push(FeatureName {
-                        kind: kind,
-                        bit: bit,
-                        name: name,
+                        kind,
+                        bit,
+                        name,
                     });
                 }
             }

@@ -1,5 +1,5 @@
 extern crate qcow2;
-use std::io::Write;
+
 
 trait OrDie<T> {
     fn or_die(self, msg: &str, path: &str) -> T;
@@ -9,7 +9,7 @@ impl<T, E: std::fmt::Display> OrDie<T> for Result<T, E> {
         match self {
             Ok(t) => t,
             Err(e) => {
-                writeln!(std::io::stderr(), "{} `{}': {}", msg, path, e).unwrap();
+                eprintln!("{} `{}': {}", msg, path, e);
                 std::process::exit(1);
             }
         }

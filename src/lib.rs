@@ -107,7 +107,7 @@ impl<I> Qcow2<I>
         let io: ByteIo<_, BigEndian> = ByteIo::new(io);
         let mut q = Qcow2 {
             header: Default::default(),
-            io: io,
+            io,
             l2_cache: Mutex::new(LruCache::new(L2_CACHE_SIZE)),
         };
         try!(q.header.read(&mut q.io));

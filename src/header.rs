@@ -50,9 +50,9 @@ const COMPATIBLE_LAZY_REFCOUNTS: u64 = 0b1;
 #[allow(dead_code)]
 const AUTOCLEAR_BITMAPS: u64 = 0b1;
 
-static INCOMPATIBLE_NAMES: &'static [&'static str] = &["dirty", "corrupt"];
-static COMPATIBLE_NAMES: &'static [&'static str] = &["lazy refcounts"];
-static AUTOCLEAR_NAMES: &'static [&'static str] = &["bitmaps"];
+static INCOMPATIBLE_NAMES: &[&str] = &["dirty", "corrupt"];
+static COMPATIBLE_NAMES: &[&str] = &["lazy refcounts"];
+static AUTOCLEAR_NAMES: &[&str] = &["bitmaps"];
 
 const HEADER_LENGTH_V3: usize = 104;
 
@@ -71,7 +71,7 @@ pub struct HeaderV3 {
 }
 impl HeaderV3 {
     // Get an extension by extension code. If we can't find one, use UnknownExtension.
-    pub fn extension(&mut self, code: u32) -> &mut Extension {
+    pub fn extension(&mut self, code: u32) -> &mut dyn Extension {
         match code {
             extension::EXT_CODE_FEATURE_NAME_TABLE => &mut self.feature_name_table,
             _ => {
@@ -204,7 +204,7 @@ impl Header {
             {
                 let take = io.take(len);
                 let mut sub = ByteIo::<_, BigEndian>::new(take);
-                let mut ext = self.v3.extension(ext_code);
+                let ext = self.v3.extension(ext_code);
                 try!(ext.read(&mut sub));
 
                 // Verify all is read.

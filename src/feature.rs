@@ -20,8 +20,8 @@ impl Feature {
     pub fn new(kind: FeatureKind, names: &'static [&'static str]) -> Self {
         Feature {
             bits: 0,
-            kind: kind,
-            names: names,
+            kind,
+            names,
         }
     }
 

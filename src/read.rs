@@ -48,7 +48,7 @@ impl<I> Qcow2<I>
     /// Get a Reader for the main virtual disk.
     ///
     /// This allows data to be read from inside the virtual disk image.
-    pub fn reader<'a>(&'a self) -> Result<Reader<I>> {
+    pub fn reader(&self) -> Result<Reader<I>> {
         let offset = self.header.c.l1_table_offset;
         let reader = try!(Reader::new(self, offset));
         Ok(reader)
@@ -66,7 +66,7 @@ impl<I> Qcow2<I>
             return Ok(L1Entry::Empty);
         }
         Ok(L1Entry::Standard {
-            pos: pos,
+            pos,
             cow: (entry & L1_COW != 0),
         })
     }
@@ -91,9 +91,9 @@ impl<I> Qcow2<I>
             let pos = entry & ((1 << x) - 1);
             let size = (entry >> x) * 512;
             L2Entry::Compressed {
-                pos: pos,
-                cow: cow,
-                size: size,
+                pos,
+                cow,
+                size,
             }
         } else {
             if entry & L2_RESERVED != 0 {
@@ -102,8 +102,8 @@ impl<I> Qcow2<I>
             let pos = entry & L2_POS;
             if pos != 0 {
                 L2Entry::Standard {
-                    pos: pos,
-                    cow: cow,
+                    pos,
+                    cow,
                     zero: (entry & L2_ZERO != 0),
                 }
             } else {
@@ -143,7 +143,7 @@ impl<I> Qcow2<I>
         }
         Ok(())
     }
-    fn guest_read<T: ReadIntAt>(&self, l1: &T, pos: u64, mut buf: &mut [u8]) -> io::Result<usize> {
+    fn guest_read<T: ReadIntAt>(&self, l1: &T, pos: u64, buf: &mut [u8]) -> io::Result<usize> {
         // Check for reads past EOF.
         if pos >= self.header.guest_size() {
             return Ok(0);
@@ -153,7 +153,7 @@ impl<I> Qcow2<I>
 
         let mut offset = pos % self.cluster_size();
         let mut guest_block_pos = pos - offset;
-        while buf.len() > 0 {
+        while !buf.is_empty() {
             let entry = try!(self.l2_entry_read(l1, guest_block_pos));
             let size = min(buf.len() as u64, self.cluster_size() - offset) as usize;
             try!(self.guest_block_read(entry, offset, &mut buf[..size]));
@@ -183,14 +183,14 @@ impl<'a, I: 'a + ReadAt> Reader<'a, I> {
     fn new(q: &'a Qcow2<I>, l1_offset: u64) -> Result<Self> {
         let buf = try!(q.l1_read(l1_offset));
         let l1 = ByteIo::<_, BigEndian>::new(buf);
-        Ok(Reader { q: q, l1: l1 })
+        Ok(Reader { q, l1 })
     }
 }
 
 impl<'a, I> ReadAt for Reader<'a, I>
     where I: 'a + ReadAt
 {
-    fn read_at(&self, pos: u64, mut buf: &mut [u8]) -> io::Result<usize> {
+    fn read_at(&self, pos: u64, buf: &mut [u8]) -> io::Result<usize> {
         self.q.guest_read(&self.l1, pos, buf)
     }
 }
