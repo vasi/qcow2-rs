@@ -18,13 +18,13 @@ use positioned_io::ReadAt;
 use qcow2::Qcow2;
 
 // Open a qcow2 file.
-let file = try!(File::open("image.qcow2"));
-let qcow = try!(Qcow2::open(file));
+let file = File::open("image.qcow2")?;
+let qcow = Qcow2::open(file)?;
 
 // Read some data from the middle.
-let reader = try!(qcow.reader());
+let reader = qcow.reader()?;
 let mut buf = vec![0, 4096];
-try!(reader.read_exact_at(5 * 1024 * 1024, &mut buf));
+reader.read_exact_at(5 * 1024 * 1024, &mut buf)?;
 ```
 
 ### Documentation

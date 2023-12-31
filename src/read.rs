@@ -50,13 +50,13 @@ impl<I> Qcow2<I>
     /// This allows data to be read from inside the virtual disk image.
     pub fn reader(&self) -> Result<Reader<I>> {
         let offset = self.header.c.l1_table_offset;
-        let reader = try!(Reader::new(self, offset));
+        let reader = Reader::new(self, offset)?;
         Ok(reader)
     }
 
     fn l1_entry_read<T: ReadIntAt>(&self, l1: &T, l1_l2_idx: u64) -> Result<L1Entry> {
         let offset = l1_l2_idx * size_of::<u64>() as u64;
-        let entry = try!(l1.read_u64_at(offset));
+        let entry = l1.read_u64_at(offset)?;
         if entry & L1_RESERVED != 0 {
             return Err(Error::FileFormat("reserved bit used in L1 entry".to_owned()));
         }
@@ -74,12 +74,12 @@ impl<I> Qcow2<I>
         let offset = l2_pos + l2_block_idx * size_of::<u64>() as u64;
 
         // Check the cache.
-        let mut cache = try!(self.l2_cache.lock());
+        let mut cache = self.l2_cache.lock()?;
         if let Some(ret) = cache.get_mut(&offset) {
             return Ok(*ret);
         }
 
-        let ret = try!(self.io.read_u64_at(offset));
+        let ret = self.io.read_u64_at(offset)?;
         cache.insert(offset, ret);
         Ok(ret)
     }
@@ -113,12 +113,12 @@ impl<I> Qcow2<I>
     }
     fn l2_entry_read<T: ReadIntAt>(&self, l1: &T, guest_offset: u64) -> Result<L2Entry> {
         let (l1_l2_idx, l2_block_idx, _) = self.header.guest_offset_info(guest_offset);
-        let l1_entry = try!(self.l1_entry_read(l1, l1_l2_idx));
+        let l1_entry = self.l1_entry_read(l1, l1_l2_idx)?;
         Ok(match l1_entry {
             L1Entry::Empty => L2Entry::Empty,
             L1Entry::Standard { pos, .. } => {
-                let raw = try!(self.l2_entry_read_raw(pos, l2_block_idx));
-                try!(self.l2_entry_parse(raw))
+                let raw = self.l2_entry_read_raw(pos, l2_block_idx)?;
+                self.l2_entry_parse(raw)?
             }
         })
     }
@@ -134,7 +134,7 @@ impl<I> Qcow2<I>
                 if zero {
                     Self::zero_fill(buf)
                 } else {
-                    try!(self.io.read_exact_at(pos + offset, buf))
+                    self.io.read_exact_at(pos + offset, buf)?
                 }
             }
             L2Entry::Compressed { .. } => {
@@ -154,9 +154,9 @@ impl<I> Qcow2<I>
         let mut offset = pos % self.cluster_size();
         let mut guest_block_pos = pos - offset;
         while !buf.is_empty() {
-            let entry = try!(self.l2_entry_read(l1, guest_block_pos));
+            let entry = self.l2_entry_read(l1, guest_block_pos)?;
             let size = min(buf.len() as u64, self.cluster_size() - offset) as usize;
-            try!(self.guest_block_read(entry, offset, &mut buf[..size]));
+            self.guest_block_read(entry, offset, &mut buf[..size])?;
 
             let tmp = buf;
             buf = &mut tmp[size..];
@@ -168,7 +168,7 @@ impl<I> Qcow2<I>
 
     fn l1_read(&self, l1_offset: u64) -> Result<Vec<u8>> {
         let mut buf = vec![0; self.header.l1_entries() as usize * size_of::<u64>()];
-        try!(self.io.read_exact_at(l1_offset, &mut buf));
+        self.io.read_exact_at(l1_offset, &mut buf)?;
         Ok(buf)
     }
 }
@@ -181,7 +181,7 @@ pub struct Reader<'a, I: 'a + ReadAt> {
 
 impl<'a, I: 'a + ReadAt> Reader<'a, I> {
     fn new(q: &'a Qcow2<I>, l1_offset: u64) -> Result<Self> {
-        let buf = try!(q.l1_read(l1_offset));
+        let buf = q.l1_read(l1_offset)?;
         let l1 = ByteIo::<_, BigEndian>::new(buf);
         Ok(Reader { q, l1 })
     }

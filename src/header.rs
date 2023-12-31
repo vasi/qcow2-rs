@@ -162,27 +162,27 @@ impl Header {
 
     // Read the common header.
     fn read_common<I: Read>(&mut self, io: &mut ByteIo<I, BigEndian>) -> Result<()> {
-        self.c.magic = try!(io.read_u32());
-        self.c.version = try!(io.read_u32());
-        self.c.backing_file_offset = try!(io.read_u64());
-        self.c.backing_file_size = try!(io.read_u32());
-        self.c.cluster_bits = try!(io.read_u32());
-        self.c.size = try!(io.read_u64());
-        self.c.crypt_method = try!(io.read_u32());
-        self.c.l1_size = try!(io.read_u32());
-        self.c.l1_table_offset = try!(io.read_u64());
-        self.c.refcount_table_offset = try!(io.read_u64());
-        self.c.refcount_table_clusters = try!(io.read_u32());
-        self.c.nb_snapshots = try!(io.read_u32());
-        self.c.snapshots_offset = try!(io.read_u64());
-        try!(self.validate_common());
+        self.c.magic = io.read_u32()?;
+        self.c.version = io.read_u32()?;
+        self.c.backing_file_offset = io.read_u64()?;
+        self.c.backing_file_size = io.read_u32()?;
+        self.c.cluster_bits = io.read_u32()?;
+        self.c.size = io.read_u64()?;
+        self.c.crypt_method = io.read_u32()?;
+        self.c.l1_size = io.read_u32()?;
+        self.c.l1_table_offset = io.read_u64()?;
+        self.c.refcount_table_offset = io.read_u64()?;
+        self.c.refcount_table_clusters = io.read_u32()?;
+        self.c.nb_snapshots = io.read_u32()?;
+        self.c.snapshots_offset = io.read_u64()?;
+        self.validate_common()?;
         Ok(())
     }
 
     fn read_extensions<I: ReadAt>(&mut self, io: &mut ByteIo<Cursor<I>, BigEndian>) -> Result<()> {
         let mut seen = HashSet::<u32>::new();
         loop {
-            let ext_code = try!(io.read_u32());
+            let ext_code = io.read_u32()?;
 
             // No duplicates allowed.
             if seen.contains(&ext_code) {
@@ -191,7 +191,7 @@ impl Header {
             }
             seen.insert(ext_code);
 
-            let len = try!(io.read_u32()) as u64;
+            let len = io.read_u32()? as u64;
             if ext_code == extension::EXT_CODE_NONE {
                 break;
             }
@@ -205,7 +205,7 @@ impl Header {
                 let take = io.take(len);
                 let mut sub = ByteIo::<_, BigEndian>::new(take);
                 let ext = self.v3.extension(ext_code);
-                try!(ext.read(&mut sub));
+                ext.read(&mut sub)?;
 
                 // Verify all is read.
                 let remain = sub.bytes().count();
@@ -219,7 +219,7 @@ impl Header {
 
             // Read padding.
             let mut pad = vec![0; padding_to_multiple(len, 8)];
-            try!(io.read_exact(&mut pad));
+            io.read_exact(&mut pad)?;
         }
         Ok(())
     }
@@ -227,7 +227,7 @@ impl Header {
     // Read a filesystem path.
     fn read_path<I: Read>(&mut self, io: &mut ByteIo<I, BigEndian>, len: usize) -> Result<PathBuf> {
         let mut buf = vec![0; len];
-        try!(io.read_exact(&mut buf));
+        io.read_exact(&mut buf)?;
 
         if cfg!(unix) {
             // Paths on unix are arbitrary byte sequences.
@@ -241,13 +241,13 @@ impl Header {
 
     // Read the version 3 header.
     fn read_v3<I: ReadAt>(&mut self, io: &mut ByteIo<Cursor<I>, BigEndian>) -> Result<()> {
-        self.v3.incompatible.set(try!(io.read_u64()));
-        self.v3.compatible.set(try!(io.read_u64()));
-        self.v3.autoclear.set(try!(io.read_u64()));
-        self.v3.refcount_order = try!(io.read_u32());
-        self.v3.header_length = try!(io.read_u32());
+        self.v3.incompatible.set(io.read_u64()?);
+        self.v3.compatible.set(io.read_u64()?);
+        self.v3.autoclear.set(io.read_u64()?);
+        self.v3.refcount_order = io.read_u32()?;
+        self.v3.header_length = io.read_u32()?;
         let actual_length = io.position();
-        try!(self.read_extensions(io));
+        self.read_extensions(io)?;
         if self.c.backing_file_offset != 0 {
             println!("{}, {}", self.c.backing_file_offset, io.position());
             if self.c.backing_file_offset != io.position() {
@@ -257,14 +257,14 @@ impl Header {
             // Need an extra copy to defeat borrow checker.
             // See https://github.com/rust-lang/rust/issues/29975
             let backing_file_size = self.c.backing_file_size;
-            self.v3.backing_file_name = try!(self.read_path(io, backing_file_size as usize));
+            self.v3.backing_file_name = self.read_path(io, backing_file_size as usize)?;
         }
 
         // Validation.
         if self.v3.incompatible.enabled(INCOMPATIBLE_CORRUPT) {
             return Err(Error::UnsupportedFeature("corrupt bit".to_owned()));
         }
-        try!(self.v3.incompatible.ensure_known(&self.v3.feature_name_table));
+        self.v3.incompatible.ensure_known(&self.v3.feature_name_table)?;
         if self.v3.refcount_order > 6 {
             return Err(Error::FileFormat(format!("bad refcount_order {}", self.v3.refcount_order)));
         }
@@ -292,8 +292,8 @@ impl Header {
         let mut io: ByteIo<_, BigEndian> = ByteIo::new(curs);
 
         // Read the header.
-        try!(self.read_common(&mut io));
-        try!(self.read_v3(&mut io));
+        self.read_common(&mut io)?;
+        self.read_v3(&mut io)?;
         Ok(())
     }
 

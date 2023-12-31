@@ -36,7 +36,7 @@ impl Extension for UnknownExtension {
         self.code
     }
     fn read(&mut self, io: &mut dyn ReadInt) -> Result<()> {
-        try!(io.read_to_end(&mut self.data));
+        io.read_to_end(&mut self.data)?;
         Ok(())
     }
 }
@@ -82,14 +82,14 @@ impl Extension for FeatureNameTable {
                             .to_owned()));
                     }
 
-                    let bit = try!(io.read_u8());
+                    let bit = io.read_u8()?;
                     if bit > 63 {
                         return Err(Error::FileFormat("bit number too high in feature name table"
                             .to_owned()));
                     }
 
                     let mut buf = [0; 46];
-                    try!(io.read_exact(&mut buf));
+                    io.read_exact(&mut buf)?;
                     // Remove trailing zero bytes from name.
                     let chars = buf.iter()
                         .take_while(|&&c| c != 0).copied()
