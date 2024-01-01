@@ -42,19 +42,7 @@ impl<T> From<PoisonError<T>> for Error {
 }
 
 impl StdError for Error {
-    fn description(&self) -> &str {
-        match *self {
-            Error::Io(ref err) => err.description(),
-            Error::FileType => "Not a qcow2 file",
-            Error::Version(_) => "Unsupported version",
-            Error::UnsupportedFeature(_) => "Unsupported feature",
-            Error::FileFormat(_) => "Malformed qcow2 file",
-            Error::Internal(_) => "Internal error",
-            Error::Poison(ref s) => s,
-        }
-    }
-
-    fn cause(&self) -> Option<&StdError> {
+    fn cause(&self) -> Option<&dyn StdError> {
         match *self {
             Error::Io(ref err) => Some(err),
             _ => None,
@@ -66,11 +54,12 @@ impl Display for Error {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         match *self {
             Error::Io(ref err) => err.fmt(f),
+            Error::FileType => f.write_str("Not a qcow2 file"),
             Error::Version(found) => write!(f, "Unsupported version {}", found),
             Error::UnsupportedFeature(ref feat) => write!(f, "Unsupported feature: {}", feat),
             Error::FileFormat(ref err) => write!(f, "Malformed qcow2 file: {}", err),
             Error::Internal(ref err) => write!(f, "Internal error: {}", err),
-            _ => f.write_str(self.description()),
+            Error::Poison(ref s) => f.write_str(s),
         }
     }
 }

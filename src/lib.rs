@@ -75,13 +75,13 @@ const L2_CACHE_SIZE: usize = 32;
 /// # fn foo() -> qcow2::Result<()> {
 ///
 /// // Open a file.
-/// let file = try!(File::open("image.qcow2"));
-/// let qcow = try!(Qcow2::open(file));
+/// let file = File::open("image.qcow2")?;
+/// let qcow = Qcow2::open(file)?;
 ///
 /// // Read some data.
-/// let reader = try!(qcow.reader());
+/// let reader = qcow.reader()?;
 /// let mut buf = vec![0, 4096];
-/// try!(reader.read_exact_at(5 * 1024 * 1024, &mut buf));
+/// reader.read_exact_at(5 * 1024 * 1024, &mut buf)?;
 ///
 /// # Ok(()) } fn main() { foo().unwrap(); }
 /// ```
@@ -107,10 +107,10 @@ impl<I> Qcow2<I>
         let io: ByteIo<_, BigEndian> = ByteIo::new(io);
         let mut q = Qcow2 {
             header: Default::default(),
-            io: io,
+            io,
             l2_cache: Mutex::new(LruCache::new(L2_CACHE_SIZE)),
         };
-        try!(q.header.read(&mut q.io));
+        q.header.read(&mut q.io)?;
         Ok(q)
     }
 
