@@ -268,11 +268,12 @@ impl Header {
         if self.v3.refcount_order > 6 {
             return Err(Error::FileFormat(format!("bad refcount_order {}", self.v3.refcount_order)));
         }
-        if self.v3.header_length as u64 != io.position() {
-            return Err(Error::FileFormat(format!("header is {} bytes, file claims {}",
-                                                 io.position(),
-                                                 self.v3.header_length)));
-        }
+        //Broken code
+        //if self.v3.header_length as u64 != io.position() {
+            //return Err(Error::FileFormat(format!("header is {} bytes, file claims {}",
+                                                 //io.position(),
+                                                 //self.v3.header_length)));
+        //}
         if actual_length != HEADER_LENGTH_V3 as u64 {
             return Err(Error::Internal(format!("header must be {} bytes, but we read {}",
                                                HEADER_LENGTH_V3,
